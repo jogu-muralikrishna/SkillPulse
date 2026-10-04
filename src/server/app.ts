@@ -413,9 +413,9 @@ router.post('/simulate', (req: Request, res: Response) => {
 // 8. Skill Priority Ranking (Supports both POST and GET)
 router.post('/priority', (req: Request, res: Response) => {
   try {
-    const { state, district, weights } = req.body || {};
+    const { state, district, period, weights } = req.body || {};
     const mergedWeights = { ...DEFAULT_PRIORITY_WEIGHTS, ...(weights || {}) };
-    const rankings = calculateSkillPriorities(state, district, mergedWeights);
+    const rankings = calculateSkillPriorities(state, district, mergedWeights, period);
     res.json({ success: true, weights: mergedWeights, rankings });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to calculate priorities' });
@@ -424,8 +424,8 @@ router.post('/priority', (req: Request, res: Response) => {
 
 router.get('/priority', (req: Request, res: Response) => {
   try {
-    const { state, district } = req.query as Record<string, string>;
-    const rankings = calculateSkillPriorities(state, district, DEFAULT_PRIORITY_WEIGHTS);
+    const { state, district, period } = req.query as Record<string, string>;
+    const rankings = calculateSkillPriorities(state, district, DEFAULT_PRIORITY_WEIGHTS, period);
     res.json({ success: true, weights: DEFAULT_PRIORITY_WEIGHTS, rankings });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to calculate priorities' });

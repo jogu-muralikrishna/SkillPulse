@@ -63,7 +63,15 @@ export function calculateSkillGaps(filters?: {
   skill?: string;
   period?: string;
 }, thresholds: GapThresholds = DEFAULT_THRESHOLDS): SkillGapAnalysis[] {
-  const targetPeriod = filters?.period || '2024-Q4';
+  let targetPeriod = filters?.period;
+  if (!targetPeriod) {
+    const locDemand = filterByCanonicalGeography(DEMAND_RECORDS, { state: filters?.state, district: filters?.district });
+    const locPeriods = Array.from(new Set(locDemand.map(d => d.period))).sort();
+    const locSupply = filterByCanonicalGeography(SUPPLY_WORKER_RECORDS, { state: filters?.state, district: filters?.district });
+    const supplyPeriods = new Set(locSupply.map(s => s.period));
+    const overlappingPeriod = locPeriods.slice().reverse().find(p => supplyPeriods.has(p));
+    targetPeriod = overlappingPeriod || (locPeriods.length > 0 ? locPeriods[locPeriods.length - 1] : '2026-Q3');
+  }
 
   // Filter demand records matching criteria using canonical geography
   let demandSubset = DEMAND_RECORDS.filter(d => d.period === targetPeriod);
@@ -808,9 +816,10 @@ export const DEFAULT_PRIORITY_WEIGHTS: PriorityWeights = {
 export function calculateSkillPriorities(
   state?: string,
   district?: string,
-  weights: PriorityWeights = DEFAULT_PRIORITY_WEIGHTS
+  weights: PriorityWeights = DEFAULT_PRIORITY_WEIGHTS,
+  period?: string
 ): SkillPriority[] {
-  const gaps = calculateSkillGaps({ state, district }).filter(g => g.isComparable);
+  const gaps = calculateSkillGaps({ state, district, period }).filter(g => g.isComparable);
 
   if (gaps.length === 0) return [];
 

@@ -176,6 +176,7 @@ export interface SupplyWorkerRecord {
   district: string;
   state_id?: string;
   district_id?: string;
+  lgd_state_code?: number;
   lgd_district_code?: number;
   geography_level?: GeographyLevel;
   population_scope?: WorkerPopulationScope;
@@ -193,6 +194,7 @@ export interface TrainingRecord {
   district: string;
   state_id?: string;
   district_id?: string;
+  lgd_state_code?: number;
   lgd_district_code?: number;
   geography_level?: GeographyLevel;
   sector: string;

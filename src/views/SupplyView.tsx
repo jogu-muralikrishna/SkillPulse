@@ -364,7 +364,13 @@ export const SupplyView: React.FC = () => {
                             <td className="py-2.5 px-4 text-right font-mono font-bold text-indigo-600 tabular-nums">
                               {w.workerCount.toLocaleString()}
                             </td>
-                            <td className="py-2.5 px-4 text-[11px] text-slate-500">Registered Jobseekers</td>
+                            <td className="py-2.5 px-4 text-[11px] text-slate-500">
+                              {w.population_scope === 'UNORGANISED_WORKFORCE'
+                                ? 'Unorganised Workforce'
+                                : w.population_scope === 'FORMAL_JOBSEEKERS'
+                                ? 'Registered Jobseekers'
+                                : (w.population_scope ? w.population_scope.replace(/_/g, ' ') : 'Registered Jobseekers')}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -405,7 +411,9 @@ export const SupplyView: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {trainingRecords.map((t: any) => {
-                          const placementRate = t.certifiedCount > 0 ? Math.round((t.placedCount / t.certifiedCount) * 100) : 0;
+                          const hasCertified = t.certifiedCount !== null && t.certifiedCount !== undefined && t.certifiedCount > 0;
+                          const hasPlaced = t.placedCount !== null && t.placedCount !== undefined;
+                          const placementRate = (hasCertified && hasPlaced) ? Math.round((t.placedCount / t.certifiedCount) * 100) : null;
                           return (
                             <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-2.5 px-4">
@@ -418,23 +426,27 @@ export const SupplyView: React.FC = () => {
                               </td>
                               <td className="py-2.5 px-4 text-slate-700">{t.normalizedSkill}</td>
                               <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 tabular-nums">
-                                {t.annualCapacity.toLocaleString()}
+                                {t.annualCapacity !== null && t.annualCapacity !== undefined ? t.annualCapacity.toLocaleString() : '—'}
                               </td>
                               <td className="py-2.5 px-4 text-right font-mono text-slate-600 tabular-nums">
-                                {t.enrolledCount.toLocaleString()}
+                                {t.enrolledCount !== null && t.enrolledCount !== undefined ? t.enrolledCount.toLocaleString() : (t.trainedCount !== null && t.trainedCount !== undefined ? `${t.trainedCount.toLocaleString()} (Trained)` : '—')}
                               </td>
                               <td className="py-2.5 px-4 text-right font-mono text-slate-700 tabular-nums">
-                                {t.certifiedCount.toLocaleString()}
+                                {t.certifiedCount !== null && t.certifiedCount !== undefined ? t.certifiedCount.toLocaleString() : '—'}
                               </td>
                               <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-600 tabular-nums">
-                                {t.placedCount.toLocaleString()}
+                                {t.placedCount !== null && t.placedCount !== undefined ? t.placedCount.toLocaleString() : '—'}
                               </td>
                               <td className="py-2.5 px-4 text-right">
-                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                  placementRate >= 70 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {placementRate}%
-                                </span>
+                                {placementRate !== null ? (
+                                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    placementRate >= 70 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {placementRate}%
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 text-[11px]">—</span>
+                                )}
                               </td>
                             </tr>
                           );

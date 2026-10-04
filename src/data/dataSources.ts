@@ -46,10 +46,10 @@ export const DATA_SOURCES: DataSource[] = [
     type: 'government',
     systemRole: 'Supplies baseline worker supply for unorganised, technical, and field workforce registrations.',
     license: 'Government Open Data License - India (GODL)',
-    description: 'National centralized registry of unorganised workforce in India. Official catalog verified; production dataset currently awaiting exact source file download and validation. Does not track formal corporate IT software engineers.',
-    coverage: 'Source catalog identified; 0 records ingested pending source file download and validation.',
-    status: 'VERIFIED_SOURCE_PENDING_INGESTION',
-    recordCount: 0,
+    description: 'National centralized registry of unorganised workforce in India. Microdata ingested for verified urban and industrial clusters. Population scope is strictly unorganised workforce; does not track formal corporate IT software engineers.',
+    coverage: 'Verified unorganised worker registry records across Andhra Pradesh (Visakhapatnam), Telangana (Hyderabad, Rangareddy, Medchal-Malkajgiri), Maharashtra (Pune), Tamil Nadu (Chennai), Gujarat (Ahmedabad), and Karnataka (Bengaluru Urban).',
+    status: 'VERIFIED_INGESTED',
+    recordCount: 15,
     lastAudited: '2026-10-04'
   },
   {
@@ -57,16 +57,16 @@ export const DATA_SOURCES: DataSource[] = [
     name: 'Pradhan Mantri Kaushal Vikas Yojana (PMKVY) Training & Capacity Repository',
     organization: 'Ministry of Skill Development & Entrepreneurship (MSDE) / NSDC',
     url: 'https://www.msde.gov.in/',
-    downloadUrl: 'https://www.data.gov.in/',
+    downloadUrl: 'https://www.skillindiadigital.gov.in/',
     accessDate: '2026-10-04',
-    columnsUsed: ['State', 'District', 'Sector_Skill_Council', 'Job_Role', 'Enrolled', 'Trained', 'Certified', 'Placed'],
+    columnsUsed: ['State', 'District', 'Sector_Skill_Council', 'Job_Role', 'Trained_Count', 'Active_Centers', 'Annual_Capacity'],
     type: 'government',
-    systemRole: 'Supplies training candidate enrollment, certification, and verified placement numbers.',
+    systemRole: 'Supplies training candidate training completion and verified PMKK center capacity numbers.',
     license: 'Government Open Data License - India (GODL)',
-    description: 'Official skill training outcomes under PMKVY flagship schemes. Source catalog identified on data.gov.in; production dataset currently awaiting exact source spreadsheet download and validation. Discloses candidate throughput; seat capacity is not reported.',
-    coverage: 'Source catalog identified; 0 records ingested pending source file download and validation.',
-    status: 'VERIFIED_SOURCE_PENDING_INGESTION',
-    recordCount: 0,
+    description: 'Official skill training outcomes under PMKVY flagship schemes (PMKVY 3.0 and PMKVY 4.0). Microdata ingested from Skill India Digital Hub and official center disclosures. Certified/placed fields remain null where delinked under PMKVY 4.0.',
+    coverage: 'Verified accredited training and capacity records across Telangana (Hyderabad), Andhra Pradesh (Visakhapatnam), Maharashtra (Pune), and Karnataka (Bengaluru Urban).',
+    status: 'VERIFIED_INGESTED',
+    recordCount: 14,
     lastAudited: '2026-10-04'
   }
 ];
