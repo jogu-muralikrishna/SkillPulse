@@ -41,6 +41,18 @@ const isProd = process.env.NODE_ENV === 'production';
 
 app.use(express.json());
 
+// Enable standard CORS headers
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
 // In-memory editable mappings store
 let currentSkillMappings = [...INITIAL_SKILL_MAPPINGS];
 
@@ -793,6 +805,22 @@ async function startServer() {
   });
 }
 
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
-});
+// Only start server listener if running standalone directly (not in Vercel serverless environment or when imported)
+const isMain = Boolean(
+  !process.env.VERCEL &&
+  process.argv[1] &&
+  !process.argv[1].includes('api') &&
+  (path.resolve(process.argv[1]) === path.resolve(__filename) ||
+   process.argv[1].endsWith('server.ts') ||
+   process.argv[1].endsWith('server.js'))
+);
+
+if (isMain) {
+  startServer().catch(err => {
+    console.error('Failed to start server:', err);
+  });
+}
+
+export default app;
+export { app };
+
