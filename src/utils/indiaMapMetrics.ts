@@ -2,23 +2,31 @@
  * India Administrative Map Labour-Market Metrics Engine
  * Connects official real datasets (NCS demand, e-Shram workforce, MSDE PMKVY training)
  * to geographic boundaries without inventing synthetic values.
+ * 
+ * Strict Comparability Constraints:
+ * 1. Missing data != zero
+ * 2. Unfiled workforce != moderate gap
+ * 3. Demand-only locations remain UNAVAILABLE (White/Grey)
+ * 4. Only comparable skill pairs (matching period, geography level, and compatible population scope)
+ *    produce Lower Gap (Green), Moderate Gap (Orange), or Higher Gap (Red).
  */
 
 import { DEMAND_RECORDS } from '../data/demandData';
 import { SUPPLY_WORKER_RECORDS } from '../data/supplyData';
 import { TRAINING_RECORDS } from '../data/trainingData';
-import { LOCATIONS } from '../data/locations';
 import { filterByCanonicalGeography } from './canonicalGeography';
+import { calculateSkillGaps } from './analyticsEngine';
 
 export interface LocationLabourMetrics {
   hasData: boolean;
+  isComparable: boolean;
   totalDemand: number;
   totalWorkers: number;
   totalTrainingCapacity: number;
   totalCertified: number;
   effectiveSupply: number;
-  gap: number;
-  gapPercentage: number;
+  gap: number | null;
+  gapPercentage: number | null;
   gapCategory: 'HIGH_SHORTAGE' | 'MODERATE_SHORTAGE' | 'LOWER_GAP' | 'UNAVAILABLE';
   gapLabel: string;
   expectedDemand: number | null;
@@ -54,13 +62,14 @@ export function getStateLabourMetrics(
   if (!stateName || typeof stateName !== 'string') {
     return {
       hasData: false,
+      isComparable: false,
       totalDemand: 0,
       totalWorkers: 0,
       totalTrainingCapacity: 0,
       totalCertified: 0,
       effectiveSupply: 0,
-      gap: 0,
-      gapPercentage: 0,
+      gap: null,
+      gapPercentage: null,
       gapCategory: 'UNAVAILABLE',
       gapLabel: 'Labour-market data unavailable',
       expectedDemand: null,
@@ -99,13 +108,14 @@ export function getStateLabourMetrics(
   if (dem.length === 0 && sup.length === 0 && tra.length === 0) {
     return {
       hasData: false,
+      isComparable: false,
       totalDemand: 0,
       totalWorkers: 0,
       totalTrainingCapacity: 0,
       totalCertified: 0,
       effectiveSupply: 0,
-      gap: 0,
-      gapPercentage: 0,
+      gap: null,
+      gapPercentage: null,
       gapCategory: 'UNAVAILABLE',
       gapLabel: 'Labour-market data unavailable',
       expectedDemand: null,
@@ -114,27 +124,40 @@ export function getStateLabourMetrics(
     };
   }
 
+  // Calculate gaps using project's canonical calculation engine
+  const gaps = calculateSkillGaps({
+    state: stateName,
+    skill: skillFilter,
+    sector: sectorFilter
+  });
+
+  const comparableGaps = gaps.filter(g => g.isComparable);
+  const isComparable = comparableGaps.length > 0;
+
   // Latest quarter demand sum (avoiding summing multiple historical quarters together)
   const periods = Array.from(new Set(dem.map(d => d.period))).sort();
-  const latestPeriod = periods[periods.length - 1] || '2024-Q4';
+  const latestPeriod = periods[periods.length - 1] || '2026-Q3';
   const latestDem = dem.filter(d => d.period === latestPeriod);
 
   const totalDemand = latestDem.reduce((sum, d) => sum + d.demandCount, 0);
-  const totalWorkers = sup.reduce((sum, s) => sum + s.workerCount, 0);
-  const totalCertified = tra.reduce((sum, t) => sum + (t.certifiedCount || 0), 0);
-  const totalPlaced = tra.reduce((sum, t) => sum + (t.placedCount || 0), 0);
   const totalTrainingCapacity = tra.reduce((sum, t) => sum + (t.annualCapacity || 0), 0);
+  const totalCertified = tra.reduce((sum, t) => sum + (t.certifiedCount || 0), 0);
 
-  // Effective Supply = Registered Available Workforce
-  const effectiveSupply = totalWorkers;
-  const isComparable = totalDemand > 0 && totalWorkers > 0;
-  const gap = isComparable ? totalDemand - effectiveSupply : 0;
-  const gapPercentage = isComparable && totalDemand > 0 ? Math.round((gap / totalDemand) * 100) : 0;
-
-  let gapCategory: 'HIGH_SHORTAGE' | 'MODERATE_SHORTAGE' | 'LOWER_GAP' | 'UNAVAILABLE' = 'LOWER_GAP';
-  let gapLabel = 'Lower potential gap';
+  let totalWorkers = 0;
+  let effectiveSupply = 0;
+  let gap: number | null = null;
+  let gapPercentage: number | null = null;
+  let gapCategory: 'HIGH_SHORTAGE' | 'MODERATE_SHORTAGE' | 'LOWER_GAP' | 'UNAVAILABLE' = 'UNAVAILABLE';
+  let gapLabel = 'Data unavailable / Non-comparable';
 
   if (isComparable) {
+    const compDemand = comparableGaps.reduce((sum, g) => sum + g.demand, 0);
+    const compSupply = comparableGaps.reduce((sum, g) => sum + (g.workerSupply || 0), 0);
+    totalWorkers = compSupply;
+    effectiveSupply = compSupply;
+    gap = compDemand - compSupply;
+    gapPercentage = compDemand > 0 ? Math.round((gap / compDemand) * 100) : 0;
+
     if (gapPercentage > 35) {
       gapCategory = 'HIGH_SHORTAGE';
       gapLabel = `Higher potential gap (${gapPercentage}% deficit)`;
@@ -145,19 +168,26 @@ export function getStateLabourMetrics(
       gapCategory = 'LOWER_GAP';
       gapLabel = 'Lower potential gap (Balanced supply)';
     }
-  } else if (totalDemand > 0) {
-    gapCategory = 'UNAVAILABLE';
-    gapLabel = 'Demand verified; comparable workforce data unfiled';
   } else {
     gapCategory = 'UNAVAILABLE';
-    gapLabel = 'Workforce filed; active demand unfiled';
+    totalWorkers = 0;
+    effectiveSupply = 0;
+    gap = null;
+    gapPercentage = null;
+
+    if (totalDemand > 0) {
+      gapLabel = 'Demand verified; comparable workforce unfiled';
+    } else if (sup.length > 0) {
+      gapLabel = 'Workforce filed; active demand unfiled';
+    } else {
+      gapLabel = 'Labour-market data unavailable';
+    }
   }
 
   // Expected demand projection (if >= 4 historical observations exist)
   let expectedDemand: number | null = null;
   let expectedDemandNote = '';
   if (periods.length >= 4 && latestDem.length > 0) {
-    // Annualized projection based on empirical trend
     const firstPeriodDem = dem.filter(d => d.period === periods[0]).reduce((s, d) => s + d.demandCount, 0);
     const growth = firstPeriodDem > 0 ? (totalDemand - firstPeriodDem) / firstPeriodDem : 0.05;
     expectedDemand = Math.round(totalDemand * (1 + growth));
@@ -180,6 +210,7 @@ export function getStateLabourMetrics(
 
   return {
     hasData: true,
+    isComparable,
     totalDemand,
     totalWorkers,
     totalTrainingCapacity,
@@ -208,13 +239,14 @@ export function getDistrictLabourMetrics(
   if (!districtName || typeof districtName !== 'string') {
     return {
       hasData: false,
+      isComparable: false,
       totalDemand: 0,
       totalWorkers: 0,
       totalTrainingCapacity: 0,
       totalCertified: 0,
       effectiveSupply: 0,
-      gap: 0,
-      gapPercentage: 0,
+      gap: null,
+      gapPercentage: null,
       gapCategory: 'UNAVAILABLE',
       gapLabel: 'Labour-market data unavailable',
       expectedDemand: null,
@@ -222,6 +254,7 @@ export function getDistrictLabourMetrics(
       clusters: []
     };
   }
+
   // Filter records canonically for this district
   let dem = filterByCanonicalGeography(DEMAND_RECORDS, { state: stateName, district: districtName });
   let sup = filterByCanonicalGeography(SUPPLY_WORKER_RECORDS, { state: stateName, district: districtName });
@@ -242,13 +275,14 @@ export function getDistrictLabourMetrics(
   if (dem.length === 0 && sup.length === 0 && tra.length === 0) {
     return {
       hasData: false,
+      isComparable: false,
       totalDemand: 0,
       totalWorkers: 0,
       totalTrainingCapacity: 0,
       totalCertified: 0,
       effectiveSupply: 0,
-      gap: 0,
-      gapPercentage: 0,
+      gap: null,
+      gapPercentage: null,
       gapCategory: 'UNAVAILABLE',
       gapLabel: 'Labour-market data unavailable for this district',
       expectedDemand: null,
@@ -258,25 +292,39 @@ export function getDistrictLabourMetrics(
     };
   }
 
+  const gaps = calculateSkillGaps({
+    state: stateName,
+    district: districtName,
+    skill: skillFilter,
+    sector: sectorFilter
+  });
+
+  const comparableGaps = gaps.filter(g => g.isComparable);
+  const isComparable = comparableGaps.length > 0;
+
   const periods = Array.from(new Set(dem.map(d => d.period))).sort();
-  const latestPeriod = periods[periods.length - 1] || '2024-Q4';
+  const latestPeriod = periods[periods.length - 1] || '2026-Q3';
   const latestDem = dem.filter(d => d.period === latestPeriod);
 
   const totalDemand = latestDem.reduce((sum, d) => sum + d.demandCount, 0);
-  const totalWorkers = sup.reduce((sum, s) => sum + s.workerCount, 0);
-  const totalCertified = tra.reduce((sum, t) => sum + (t.certifiedCount || 0), 0);
-  const totalPlaced = tra.reduce((sum, t) => sum + (t.placedCount || 0), 0);
   const totalTrainingCapacity = tra.reduce((sum, t) => sum + (t.annualCapacity || 0), 0);
+  const totalCertified = tra.reduce((sum, t) => sum + (t.certifiedCount || 0), 0);
 
-  const effectiveSupply = totalWorkers;
-  const isComparable = totalDemand > 0 && totalWorkers > 0;
-  const gap = isComparable ? totalDemand - effectiveSupply : 0;
-  const gapPercentage = isComparable && totalDemand > 0 ? Math.round((gap / totalDemand) * 100) : 0;
-
-  let gapCategory: 'HIGH_SHORTAGE' | 'MODERATE_SHORTAGE' | 'LOWER_GAP' | 'UNAVAILABLE' = 'LOWER_GAP';
-  let gapLabel = 'Lower potential gap';
+  let totalWorkers = 0;
+  let effectiveSupply = 0;
+  let gap: number | null = null;
+  let gapPercentage: number | null = null;
+  let gapCategory: 'HIGH_SHORTAGE' | 'MODERATE_SHORTAGE' | 'LOWER_GAP' | 'UNAVAILABLE' = 'UNAVAILABLE';
+  let gapLabel = 'Data unavailable / Non-comparable';
 
   if (isComparable) {
+    const compDemand = comparableGaps.reduce((sum, g) => sum + g.demand, 0);
+    const compSupply = comparableGaps.reduce((sum, g) => sum + (g.workerSupply || 0), 0);
+    totalWorkers = compSupply;
+    effectiveSupply = compSupply;
+    gap = compDemand - compSupply;
+    gapPercentage = compDemand > 0 ? Math.round((gap / compDemand) * 100) : 0;
+
     if (gapPercentage > 35) {
       gapCategory = 'HIGH_SHORTAGE';
       gapLabel = `Higher potential gap (${gapPercentage}% deficit)`;
@@ -287,12 +335,20 @@ export function getDistrictLabourMetrics(
       gapCategory = 'LOWER_GAP';
       gapLabel = 'Lower potential gap (Balanced supply)';
     }
-  } else if (totalDemand > 0) {
-    gapCategory = 'UNAVAILABLE';
-    gapLabel = 'Demand verified; comparable workforce data unfiled';
   } else {
     gapCategory = 'UNAVAILABLE';
-    gapLabel = 'Workforce filed; active demand unfiled';
+    totalWorkers = 0;
+    effectiveSupply = 0;
+    gap = null;
+    gapPercentage = null;
+
+    if (totalDemand > 0) {
+      gapLabel = 'Demand verified; comparable workforce unfiled';
+    } else if (sup.length > 0) {
+      gapLabel = 'Workforce filed; active demand unfiled';
+    } else {
+      gapLabel = 'Labour-market data unavailable for this district';
+    }
   }
 
   let expectedDemand: number | null = null;
@@ -317,6 +373,7 @@ export function getDistrictLabourMetrics(
 
   return {
     hasData: true,
+    isComparable,
     totalDemand,
     totalWorkers,
     totalTrainingCapacity,
@@ -356,20 +413,47 @@ export function getNationalLabourMetrics(
     tra = tra.filter(t => t.sector.toLowerCase().includes(sectorFilter.toLowerCase()) || sectorFilter.toLowerCase().includes(t.sector.toLowerCase()));
   }
 
+  const gaps = calculateSkillGaps({
+    skill: skillFilter,
+    sector: sectorFilter
+  });
+
+  const comparableGaps = gaps.filter(g => g.isComparable);
+  const isComparable = comparableGaps.length > 0;
+
   const periods = Array.from(new Set(dem.map(d => d.period))).sort();
-  const latestPeriod = periods[periods.length - 1] || '2024-Q4';
+  const latestPeriod = periods[periods.length - 1] || '2026-Q3';
   const latestDem = dem.filter(d => d.period === latestPeriod);
 
   const totalDemand = latestDem.reduce((sum, d) => sum + d.demandCount, 0);
-  const totalWorkers = sup.reduce((sum, s) => sum + s.workerCount, 0);
-  const totalCertified = tra.reduce((sum, t) => sum + (t.certifiedCount || 0), 0);
-  const totalPlaced = tra.reduce((sum, t) => sum + (t.placedCount || 0), 0);
   const totalTrainingCapacity = tra.reduce((sum, t) => sum + (t.annualCapacity || 0), 0);
+  const totalCertified = tra.reduce((sum, t) => sum + (t.certifiedCount || 0), 0);
 
-  const effectiveSupply = totalWorkers;
-  const isComparable = totalDemand > 0 && totalWorkers > 0;
-  const gap = isComparable ? totalDemand - effectiveSupply : 0;
-  const gapPercentage = isComparable && totalDemand > 0 ? Math.round((gap / totalDemand) * 100) : 0;
+  let totalWorkers = 0;
+  let effectiveSupply = 0;
+  let gap: number | null = null;
+  let gapPercentage: number | null = null;
+  let gapCategory: 'HIGH_SHORTAGE' | 'MODERATE_SHORTAGE' | 'LOWER_GAP' | 'UNAVAILABLE' = 'UNAVAILABLE';
+  let gapLabel = 'Consolidated national labour-market overview';
+
+  if (isComparable) {
+    const compDemand = comparableGaps.reduce((sum, g) => sum + g.demand, 0);
+    const compSupply = comparableGaps.reduce((sum, g) => sum + (g.workerSupply || 0), 0);
+    totalWorkers = compSupply;
+    effectiveSupply = compSupply;
+    gap = compDemand - compSupply;
+    gapPercentage = compDemand > 0 ? Math.round((gap / compDemand) * 100) : 0;
+
+    gapCategory = gapPercentage > 35 ? 'HIGH_SHORTAGE' : gapPercentage > 15 ? 'MODERATE_SHORTAGE' : 'LOWER_GAP';
+    gapLabel = `${gapPercentage > 15 ? 'Shortage' : 'Balanced'} across verified reporting corridors (${gapPercentage}% deficit)`;
+  } else {
+    gapCategory = 'UNAVAILABLE';
+    totalWorkers = 0;
+    effectiveSupply = 0;
+    gap = null;
+    gapPercentage = null;
+    gapLabel = 'National workforce filings unfiled / non-comparable';
+  }
 
   const skillCounts: Record<string, number> = {};
   latestDem.forEach(d => {
@@ -384,6 +468,7 @@ export function getNationalLabourMetrics(
 
   return {
     hasData: true,
+    isComparable,
     totalDemand,
     totalWorkers,
     totalTrainingCapacity,
@@ -391,8 +476,8 @@ export function getNationalLabourMetrics(
     effectiveSupply,
     gap,
     gapPercentage,
-    gapCategory: gapPercentage > 35 ? 'HIGH_SHORTAGE' : gapPercentage > 15 ? 'MODERATE_SHORTAGE' : 'LOWER_GAP',
-    gapLabel: `${gapPercentage > 15 ? 'Shortage' : 'Balanced'} across verified reporting corridors`,
+    gapCategory,
+    gapLabel,
     expectedDemand: Math.round(totalDemand * 1.12),
     expectedDemandNote: 'Consolidated national projection across verified industrial corridors.',
     topSkills,
