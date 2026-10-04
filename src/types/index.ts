@@ -43,6 +43,7 @@ export interface DataCoverageStatus {
   lgdDistrictCode?: number;
   demandStatus: 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
   demandRecordsCount: number;
+  demandVerificationStatus?: 'VERIFIED_INGESTED' | 'REQUIRES_VERIFICATION' | 'UNVERIFIED';
   workerSupplyStatus: 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
   workerSupplyRecordsCount: number;
   trainingStatus: 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
@@ -54,6 +55,7 @@ export interface DataCoverageStatus {
   suggestedAction?: string;
   latestDate?: string;
   demandDate?: string;
+  supplyDate?: string;
   workerSupplyDate?: string;
   trainingDate?: string;
 }

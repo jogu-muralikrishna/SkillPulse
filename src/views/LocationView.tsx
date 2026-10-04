@@ -762,7 +762,7 @@ export const LocationView: React.FC = () => {
                   Labour-market data unavailable
                 </h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Official administrative boundary verified. Current labour-market postings and worker registry disclosures have not been filed for this selection in the connected official open datasets.
+                  Official administrative boundary verified. Verified labour-market and worker registry records have not yet been ingested for this selection.
                 </p>
                 <div className="p-2.5 bg-white rounded-lg border border-slate-200 text-[11px] text-slate-600">
                   🛡️ <strong>Zero Fake Data Standard:</strong> Missing data is not zero. We never display false numbers when official filings are absent.

@@ -223,7 +223,7 @@ export const DemandView: React.FC = () => {
 
       {/* District Data Coverage Indicator */}
       {selectedDistrict && coverage && (
-        <DataCoverageCard coverage={coverage} />
+        <DataCoverageCard coverage={coverage} domain="demand" />
       )}
 
       {/* Main Content Area */}
@@ -243,7 +243,7 @@ export const DemandView: React.FC = () => {
               District: {selectedDistrict}, {selectedState}
             </p>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Official Local Government Directory (LGD) record verified. Active vacancy filings are currently not published for this district in the connected official datasets (NCS Vacancy Portal).
+              Official Local Government Directory (LGD) record verified. Location exists, but verified demand records have not yet been ingested for this district.
             </p>
             <div className="p-3 bg-amber-50 rounded-lg text-[11px] text-amber-900 font-medium">
               Missing data is not zero. We do not invent false zeroes or synthetic numbers.

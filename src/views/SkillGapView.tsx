@@ -208,7 +208,7 @@ export const SkillGapView: React.FC = () => {
 
       {/* Coverage Card */}
       {selectedDistrict && coverage && (
-        <DataCoverageCard coverage={coverage} />
+        <DataCoverageCard coverage={coverage} domain="gaps" />
       )}
 
       {/* Main Content */}
@@ -227,7 +227,7 @@ export const SkillGapView: React.FC = () => {
               District: {selectedDistrict}, {selectedState}
             </p>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Official Local Government Directory (LGD) record verified. Comparable demand and workforce records have not been filed for this district in the connected official datasets.
+              Official Local Government Directory (LGD) record verified. Comparable demand and workforce records have not yet been ingested for this district.
             </p>
             <div className="p-3 bg-amber-50 rounded-lg text-[11px] text-amber-900 font-medium">
               Missing data is not zero. We never display false zero values (Demand = 0, Supply = 0, Gap = 0).

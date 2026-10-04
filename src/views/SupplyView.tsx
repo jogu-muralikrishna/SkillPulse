@@ -84,7 +84,7 @@ export const SupplyView: React.FC = () => {
               Supply Analysis
             </h1>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200">
-              {hasRecords ? 'Verified Ingested' : 'Awaiting Source File Ingestion'}
+              {hasRecords ? 'Verified Ingested' : 'Awaiting Source Ingestion'}
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
@@ -98,7 +98,7 @@ export const SupplyView: React.FC = () => {
             reason={
               hasRecords
                 ? "Verified worker registrations and accredited training records with valid official provenance."
-                : "Data quality information unavailable: Official workforce registry or center disclosures have not been ingested."
+                : "Workforce and training data unavailable: Verified workforce and training records have not yet been ingested for this selection."
             }
             compact={true}
           />
@@ -192,7 +192,7 @@ export const SupplyView: React.FC = () => {
 
       {/* Coverage Card */}
       {selectedDistrict && coverage && (
-        <DataCoverageCard coverage={coverage} />
+        <DataCoverageCard coverage={coverage} domain="supply" />
       )}
 
       {loading ? (
@@ -210,7 +210,7 @@ export const SupplyView: React.FC = () => {
               District: {selectedDistrict}, {selectedState}
             </p>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Official Local Government Directory (LGD) record verified. Active worker registrations or accredited center disclosures have not been filed for this district in the connected official datasets.
+              Official Local Government Directory (LGD) record verified. Verified workforce and training records have not yet been ingested for this district.
             </p>
             <div className="p-3 bg-amber-50 rounded-lg text-[11px] text-amber-900 font-medium">
               Missing data is not zero. We never display false zero values.

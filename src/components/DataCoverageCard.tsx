@@ -1,23 +1,72 @@
 import React from 'react';
 import { DataCoverageStatus } from '../types';
-import { CheckCircle2, AlertCircle, Info, Database, ShieldCheck, HelpCircle, Check, Minus } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, ShieldCheck, Check, Minus } from 'lucide-react';
 
 interface DataCoverageCardProps {
   coverage: DataCoverageStatus | null;
   className?: string;
   compact?: boolean;
+  domain?: 'all' | 'demand' | 'supply' | 'training' | 'forecast' | 'gaps';
 }
 
 export const DataCoverageCard: React.FC<DataCoverageCardProps> = ({
   coverage,
   className = '',
-  compact = false
+  compact = false,
+  domain = 'all'
 }) => {
   if (!coverage) return null;
 
   const isUnavailable = coverage.demandStatus === 'UNAVAILABLE' && coverage.workerSupplyStatus === 'UNAVAILABLE' && coverage.trainingStatus === 'UNAVAILABLE';
   const hasDemandOnly = coverage.demandStatus === 'AVAILABLE' && coverage.workerSupplyStatus === 'UNAVAILABLE';
   const hasSupplyOnly = coverage.demandStatus === 'UNAVAILABLE' && (coverage.workerSupplyStatus === 'AVAILABLE' || coverage.trainingStatus === 'AVAILABLE');
+  const isDemandVerified = coverage.demandVerificationStatus === 'VERIFIED_INGESTED';
+
+  // Domain-specific date display text (ensures Supply never leaks Demand dates)
+  let periodText = 'Records available';
+  if (domain === 'supply') {
+    periodText = coverage.supplyDate && coverage.supplyDate !== 'Unavailable'
+      ? `Supply data period: ${coverage.supplyDate}`
+      : 'Supply data period: Unavailable';
+  } else if (domain === 'demand') {
+    periodText = coverage.demandDate && coverage.demandDate !== 'Unavailable'
+      ? `Demand data period: ${coverage.demandDate}`
+      : 'Demand data period: Unavailable';
+  } else if (domain === 'training') {
+    periodText = coverage.trainingDate && coverage.trainingDate !== 'Unavailable'
+      ? `Training data period: ${coverage.trainingDate}`
+      : 'Training data period: Unavailable';
+  } else {
+    if (coverage.workerSupplyStatus === 'UNAVAILABLE' && coverage.demandStatus === 'AVAILABLE') {
+      periodText = coverage.demandDate && coverage.demandDate !== 'Unavailable'
+        ? `Demand period: ${coverage.demandDate} (Supply: Unavailable)`
+        : 'Supply: Unavailable';
+    } else if (coverage.latestDate && coverage.latestDate !== 'Unavailable') {
+      periodText = `Latest observed data: ${coverage.latestDate}`;
+    } else {
+      periodText = 'Data period: Unavailable';
+    }
+  }
+
+  // Verification-aware status badge text
+  let badgeText = 'Labour Data Unavailable';
+  if (isUnavailable) {
+    badgeText = 'Labour Data Unavailable';
+  } else if (hasDemandOnly) {
+    badgeText = isDemandVerified
+      ? 'Partial Data — Demand Available, Supply Unavailable'
+      : 'Partial Data — Demand Available, Verification Pending';
+  } else if (hasSupplyOnly) {
+    badgeText = 'Partial Data — Supply Available, Demand Unavailable';
+  } else if (coverage.gapStatus === 'NON_COMPARABLE') {
+    badgeText = isDemandVerified
+      ? 'Partial Data — Demand Available, Supply Non-Comparable'
+      : 'Partial Data — Demand Available, Verification Pending';
+  } else if (coverage.demandStatus === 'AVAILABLE' && coverage.workerSupplyStatus === 'AVAILABLE') {
+    badgeText = isDemandVerified
+      ? 'Verified Data — Demand & Supply Available'
+      : 'Data Available — Verification Pending';
+  }
 
   if (compact) {
     if (isUnavailable) {
@@ -33,7 +82,7 @@ export const DataCoverageCard: React.FC<DataCoverageCardProps> = ({
       <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs ${className}`}>
         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
         <span className="font-medium">{coverage.districtName}, {coverage.stateName}</span>
-        <span className="text-emerald-700">• {coverage.demandRecordsCount} verified labour record(s)</span>
+        <span className="text-emerald-700">• {periodText}</span>
       </div>
     );
   }
@@ -63,7 +112,7 @@ export const DataCoverageCard: React.FC<DataCoverageCardProps> = ({
             Labour-market data unavailable for this district
           </h4>
           <p className="text-xs text-amber-900/90 mt-1 leading-relaxed">
-            This district is an official administrative unit of India, but no verified employment postings or worker filings have been published yet in the current connected official datasets.
+            This district is an official administrative unit of India, but verified workforce and training records have not yet been ingested for this district.
           </p>
         </div>
 
@@ -104,7 +153,9 @@ export const DataCoverageCard: React.FC<DataCoverageCardProps> = ({
           <p>
             Missing data is <strong>NOT zero</strong>. We never display false zeros (Demand = 0, Supply = 0, Gap = 0) when official filings are absent.
             <span className="block text-slate-500 mt-0.5">
-              {coverage.latestDate ? `Latest available official data: ${coverage.latestDate}` : 'Official filings baseline: Connected national feeds'}
+              {domain === 'supply'
+                ? 'Supply records baseline: Ingestion pending from official registries'
+                : periodText}
             </span>
           </p>
         </div>
@@ -120,14 +171,14 @@ export const DataCoverageCard: React.FC<DataCoverageCardProps> = ({
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-100 text-blue-900 text-xs font-semibold">
               <Info className="w-3.5 h-3.5 text-blue-700" />
-              Partial Official Data Available
+              {badgeText}
             </span>
             <span className="text-xs text-blue-800">
               {coverage.districtName}, {coverage.stateName}
             </span>
           </div>
           <span className="text-[10px] font-medium text-slate-600 bg-white/80 px-2 py-0.5 rounded border border-blue-200">
-            {coverage.latestDate ? `Latest available data: ${coverage.latestDate}` : 'Records available'}
+            {periodText}
           </span>
         </div>
 
@@ -200,18 +251,18 @@ export const DataCoverageCard: React.FC<DataCoverageCardProps> = ({
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold text-[11px]">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            Verified Data
+            {badgeText}
           </span>
           <span className="font-medium text-slate-900">
             {coverage.districtName}, {coverage.stateName}
           </span>
         </div>
         <span className="text-[10px] text-slate-500">
-          {coverage.latestDate ? `Latest available data: ${coverage.latestDate}` : 'Verified Records'}
+          {periodText}
         </span>
       </div>
       <p className="text-[11px] text-slate-600">
-        Empirical records confirmed across official government open datasets (NCS Vacancy Portal, e-Shram Registry, MSDE PMKVY).
+        Empirical records verified across primary source documents.
       </p>
     </div>
   );

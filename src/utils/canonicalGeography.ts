@@ -435,16 +435,53 @@ export function evaluateCanonicalCoverage(
       ? 'INSUFFICIENT_DATA'
       : 'UNAVAILABLE';
 
-  const demandPeriods = matchedDemand.map(d => d.period).sort();
+  // Separate observed demand from statistical forecast records
+  const observedDemand = matchedDemand.filter(d => !d.is_forecast);
+  const forecastDemand = matchedDemand.filter(d => d.is_forecast);
+
+  const observedDemandPeriods = observedDemand.map(d => d.period).sort();
   const workerPeriods = matchedWorkers.map(s => s.period).sort();
   const trainingPeriods = matchedTraining.map(t => t.period).sort();
 
-  const allPeriods = [...demandPeriods, ...workerPeriods, ...trainingPeriods].sort();
-  const latestPeriod = allPeriods.length > 0 ? allPeriods[allPeriods.length - 1] : '';
+  // Supply periods (workers + training) strictly
+  const supplyPeriods = [...workerPeriods, ...trainingPeriods].sort();
+  const supplyDate = supplyPeriods.length > 0
+    ? formatPeriodToHuman(supplyPeriods[supplyPeriods.length - 1])
+    : 'Unavailable';
+  const workerSupplyDate = workerPeriods.length > 0
+    ? formatPeriodToHuman(workerPeriods[workerPeriods.length - 1])
+    : 'Unavailable';
+  const trainingDate = trainingPeriods.length > 0
+    ? formatPeriodToHuman(trainingPeriods[trainingPeriods.length - 1])
+    : 'Unavailable';
+
+  // Demand observed vs forecast separation
+  const demandObservedDate = observedDemandPeriods.length > 0
+    ? formatPeriodToHuman(observedDemandPeriods[observedDemandPeriods.length - 1])
+    : 'Unavailable';
+  const demandForecastDate = forecastDemand.length > 0
+    ? formatPeriodToHuman(forecastDemand[forecastDemand.length - 1].period)
+    : undefined;
+
+  const demandDate = demandObservedDate !== 'Unavailable'
+    ? demandObservedDate
+    : demandForecastDate
+    ? `${demandForecastDate} (Statistical Forecast)`
+    : 'Unavailable';
+
+  // Overall latest OBSERVED period (never derived from forward projections)
+  const allObservedPeriods = [...observedDemandPeriods, ...workerPeriods, ...trainingPeriods].sort();
+  const latestPeriod = allObservedPeriods.length > 0 ? allObservedPeriods[allObservedPeriods.length - 1] : '';
   const latestDate = latestPeriod ? formatPeriodToHuman(latestPeriod) : 'Unavailable';
-  const demandDate = demandPeriods.length > 0 ? formatPeriodToHuman(demandPeriods[demandPeriods.length - 1]) : 'Unavailable';
-  const workerSupplyDate = workerPeriods.length > 0 ? formatPeriodToHuman(workerPeriods[workerPeriods.length - 1]) : 'Unavailable';
-  const trainingDate = trainingPeriods.length > 0 ? formatPeriodToHuman(trainingPeriods[trainingPeriods.length - 1]) : 'Unavailable';
+
+  // Determine verification status of demand records
+  const hasVerifiedDemand = matchedDemand.length > 0 && matchedDemand.every(d => d.provenance?.verification_status === 'VERIFIED_INGESTED');
+  const demandVerificationStatus: 'VERIFIED_INGESTED' | 'REQUIRES_VERIFICATION' | 'UNVERIFIED' =
+    hasVerifiedDemand
+      ? 'VERIFIED_INGESTED'
+      : matchedDemand.length > 0
+      ? 'REQUIRES_VERIFICATION'
+      : 'UNVERIFIED';
 
   let message = '';
   let suggestedAction = '';
@@ -456,12 +493,12 @@ export function evaluateCanonicalCoverage(
     message = isStateLevel
       ? `Labour-market filings are currently unavailable for ${stateName}.`
       : `Labour-market filings are currently unavailable for ${districtName}, ${stateName}.`;
-    suggestedAction = 'Official Local Government Directory (LGD) record verified. Location exists, but no filings are present in the current connected datasets.';
+    suggestedAction = 'Official Local Government Directory (LGD) record verified. Location exists, but verified records have not yet been ingested.';
   } else if (gapStatus === 'NON_COMPARABLE') {
     message = `Job demand records exist (${matchedDemand.length} observation(s)), but comparable worker supply data is unavailable for this selection. Potential skill gaps cannot be calculated.`;
     suggestedAction = 'Skill gaps require verified demand and workforce supply on identical geographic and temporal boundaries.';
   } else {
-    message = `Empirical records available: ${matchedDemand.length} demand observation(s), ${matchedWorkers.length} worker registry record(s), and ${matchedTraining.length} training center record(s).`;
+    message = `Records available: ${matchedDemand.length} demand observation(s), ${matchedWorkers.length} worker registry record(s), and ${matchedTraining.length} training center record(s).`;
   }
 
   return {
@@ -471,6 +508,7 @@ export function evaluateCanonicalCoverage(
     lgdDistrictCode: canonicalDistrict?.lgd_district_code,
     demandStatus,
     demandRecordsCount: matchedDemand.length,
+    demandVerificationStatus,
     workerSupplyStatus,
     workerSupplyRecordsCount: matchedWorkers.length,
     trainingStatus,
@@ -487,6 +525,7 @@ export function evaluateCanonicalCoverage(
     suggestedAction,
     latestDate,
     demandDate,
+    supplyDate,
     workerSupplyDate,
     trainingDate
   };

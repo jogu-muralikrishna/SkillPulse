@@ -757,7 +757,28 @@ ${JSON.stringify(contextData, null, 2)}
     if (!geminiAi) {
       let reply = '';
 
-      if (lowerMsg.includes('where') && (lowerMsg.includes('data') || lowerMsg.includes('source') || lowerMsg.includes('come from'))) {
+      const isSourceQuery =
+        lowerMsg.includes('source') ||
+        lowerMsg.includes('dataset') ||
+        lowerMsg.includes('provenance') ||
+        lowerMsg.includes('data origin') ||
+        (lowerMsg.includes('where') && (lowerMsg.includes('data') || lowerMsg.includes('come from')));
+
+      const isWorkforceUnavailableQuery =
+        (lowerMsg.includes('workforce') || lowerMsg.includes('supply') || lowerMsg.includes('jobseeker') || lowerMsg.includes('worker')) &&
+        (lowerMsg.includes('unavail') || lowerMsg.includes('miss') || lowerMsg.includes('not available') || lowerMsg.includes('why') || lowerMsg.includes('empty') || lowerMsg.includes('zero') || lowerMsg.includes('lack') || lowerMsg.includes('have'));
+
+      const isUnavailableQuery =
+        lowerMsg.includes('why') && (lowerMsg.includes('unavailable') || lowerMsg.includes('missing') || lowerMsg.includes('not available') || lowerMsg.includes('no data'));
+
+      const isForecastQuery =
+        lowerMsg.includes('forecast') || lowerMsg.includes('projection') || lowerMsg.includes('future demand') || lowerMsg.includes('predict');
+
+      const isSkillGapQuery =
+        lowerMsg.includes('gap') ||
+        (lowerMsg.includes('skill') && (lowerMsg.includes('calculated') || lowerMsg.includes('calculation') || lowerMsg.includes('formula') || lowerMsg.includes('method')));
+
+      if (isSourceQuery) {
         reply = `SkillPulse relies strictly on verified public government datasets:
 
 1. Local Government Directory (LGD) — Ministry of Panchayati Raj: The official administrative geography master containing all 36 States/Union Territories and 786 Districts across India.
@@ -766,7 +787,21 @@ ${JSON.stringify(contextData, null, 2)}
 4. Ministry of Skill Development & Entrepreneurship (MSDE) / PMKVY: Accredited training center capacity, enrolled students, certified candidates, and placement outcomes.
 
 We do not use unverified web scrapes or synthetic estimates.`;
-      } else if (lowerMsg.includes('how') && (lowerMsg.includes('gap') || lowerMsg.includes('calculated') || lowerMsg.includes('calculation'))) {
+      } else if (isWorkforceUnavailableQuery || isUnavailableQuery) {
+        reply = `Workforce (supply) data is reported as "Unavailable" rather than zero because empirical candidate and worker registries are currently pending validated ingestion from primary official sources (e-Shram and PLFS).
+
+Key principles enforced:
+1. Missing Data ≠ Zero: We never report 0 simply because records are unfiled or pending validation. Displaying 0 would falsely indicate zero available workers, which would distort planning.
+2. Incompatible Populations: Unorganised worker registrations (e-Shram) cannot be directly subtracted from formal sector employer vacancies (NCS).
+3. Comparability Requirement: Skill gaps are only calculated when verified demand and supply records exist on identical spatial and temporal boundaries.`;
+      } else if (isForecastQuery) {
+        reply = `SkillPulse uses an Ordinary Least Squares (OLS) linear trend model for demand forecasting under strict data integrity constraints:
+
+1. Minimum Historical Threshold: At least 3 consecutive historical quarters of verified demand in the specific geography are required. If fewer exist, projections are withheld to avoid synthetic guesses.
+2. Clear Separation: Projections (forward quarters such as 2025/2026) are explicitly tagged as forecasts and never presented as observed historical filings.
+3. No Geographic Fallback: Forecasts are calculated strictly on the selected district's observed data; they never silently borrow trendlines from other districts (e.g. Hyderabad).
+4. What-If Testing: Planners can test hypothetical growth scenarios (+5% to +50%) in the What-If Simulator without altering baseline empirical records.`;
+      } else if (isSkillGapQuery) {
         reply = `Skill gaps in SkillPulse are calculated using an empirical comparison on identical spatial and temporal boundaries:
 
 • Demand: The number of active verified job vacancies posted by employers for a normalized skill in that specific district and time period.
@@ -855,13 +890,23 @@ Important: If demand or supply data is unfiled for a district, SkillPulse displa
 app.use('/api', router);
 app.use(router);
 
-// Structured JSON 404 Handler for API routes
-app.use((req: Request, res: Response) => {
+// Structured JSON 404 Handler for API routes (specifically for any /api/* request not handled by router)
+app.use('/api', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: `Endpoint not found: ${req.method} ${req.originalUrl || req.url}`
   });
 });
+
+// For Vercel serverless functions, any unhandled request is an unknown API endpoint
+if (process.env.VERCEL) {
+  app.use((req: Request, res: Response) => {
+    res.status(404).json({
+      success: false,
+      error: `Endpoint not found: ${req.method} ${req.originalUrl || req.url}`
+    });
+  });
+}
 
 // Global JSON Error Handler
 app.use((err: any, req: Request, res: Response, _next: any) => {
