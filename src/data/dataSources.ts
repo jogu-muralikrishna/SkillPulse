@@ -1,0 +1,72 @@
+import { DataSource } from '../types';
+
+export const DATA_SOURCES: DataSource[] = [
+  {
+    id: 'lgd-master-geography',
+    name: 'Local Government Directory (LGD) — Administrative Geography Master',
+    organization: 'Ministry of Panchayati Raj, Government of India',
+    url: 'https://lgdirectory.gov.in/',
+    downloadUrl: 'https://data.gov.in/catalog/local-government-directory-lgd',
+    accessDate: '2026-10-04',
+    columnsUsed: ['State_Code', 'State_Name', 'District_Code', 'District_Name', 'Entity_Type', 'Status'],
+    type: 'government',
+    systemRole: 'Master official administrative directory establishing the complete baseline of all 36 States/UTs and 786 Districts across India. Decouples geographic existence from dataset reporting.',
+    license: 'Government Open Data License - India (GODL)',
+    description: 'The Local Government Directory (LGD) provides the single source of truth for all administrative units in India. Every district exists in the geography database regardless of whether labour filings have occurred.',
+    coverage: '100% of Indian administrative geography: all 28 States, 8 Union Territories, and 786 official Districts verified and active.',
+    status: 'VERIFIED_INGESTED',
+    recordCount: 786,
+    lastAudited: '2026-10-04'
+  },
+  {
+    id: 'ncs-portal',
+    name: 'National Career Service (NCS) Job Vacancy & Labour Demand Statistics',
+    organization: 'Ministry of Labour & Employment, Government of India',
+    url: 'https://www.ncs.gov.in/',
+    downloadUrl: 'https://www.data.gov.in/',
+    accessDate: '2026-10-04',
+    columnsUsed: ['State', 'District', 'Sector_Name', 'NCO_Code', 'Job_Title', 'Vacancies_Count', 'Quarter', 'Year'],
+    type: 'government',
+    systemRole: 'Supplies primary labor demand and job vacancy indicators across sectors and industrial districts.',
+    license: 'Government Open Data License - India (GODL)',
+    description: 'NCS vacancy statistics. Existing 101 records are maintained temporarily for development/testing (Telangana -> Hyderabad baseline and 7 urban hubs) awaiting line-by-line primary source provenance verification. No unauthenticated public REST API exists.',
+    coverage: 'Development sample across 8 industrial clusters. Full national district coverage is not reported in public bulletins.',
+    status: 'REQUIRES_VERIFICATION',
+    recordCount: 101,
+    lastAudited: '2026-10-04'
+  },
+  {
+    id: 'eshram-registry',
+    name: 'e-Shram National Worker Registration Database',
+    organization: 'Ministry of Labour & Employment, Government of India',
+    url: 'https://eshram.gov.in/',
+    downloadUrl: 'https://eshram.gov.in/dashboard',
+    accessDate: '2026-10-04',
+    columnsUsed: ['State', 'District', 'Primary_Occupation_Group', 'Registered_Workers_Count'],
+    type: 'government',
+    systemRole: 'Supplies baseline worker supply for unorganised, technical, and field workforce registrations.',
+    license: 'Government Open Data License - India (GODL)',
+    description: 'National centralized registry of unorganised workforce in India. Official catalog verified; production dataset currently awaiting exact source file download and validation. Does not track formal corporate IT software engineers.',
+    coverage: 'Source catalog identified; 0 records ingested pending source file download and validation.',
+    status: 'VERIFIED_SOURCE_PENDING_INGESTION',
+    recordCount: 0,
+    lastAudited: '2026-10-04'
+  },
+  {
+    id: 'pmkvy-msde',
+    name: 'Pradhan Mantri Kaushal Vikas Yojana (PMKVY) Training & Capacity Repository',
+    organization: 'Ministry of Skill Development & Entrepreneurship (MSDE) / NSDC',
+    url: 'https://www.msde.gov.in/',
+    downloadUrl: 'https://www.data.gov.in/',
+    accessDate: '2026-10-04',
+    columnsUsed: ['State', 'District', 'Sector_Skill_Council', 'Job_Role', 'Enrolled', 'Trained', 'Certified', 'Placed'],
+    type: 'government',
+    systemRole: 'Supplies training candidate enrollment, certification, and verified placement numbers.',
+    license: 'Government Open Data License - India (GODL)',
+    description: 'Official skill training outcomes under PMKVY flagship schemes. Source catalog identified on data.gov.in; production dataset currently awaiting exact source spreadsheet download and validation. Discloses candidate throughput; seat capacity is not reported.',
+    coverage: 'Source catalog identified; 0 records ingested pending source file download and validation.',
+    status: 'VERIFIED_SOURCE_PENDING_INGESTION',
+    recordCount: 0,
+    lastAudited: '2026-10-04'
+  }
+];
