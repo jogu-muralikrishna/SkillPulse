@@ -172,7 +172,7 @@ export const LocationView: React.FC = () => {
 
           return {
             fillColor: color,
-            fillOpacity: metrics.hasData ? 0.85 : 0.65,
+            fillOpacity: metrics.gapCategory !== 'UNAVAILABLE' ? 0.85 : 0.45,
             color: '#475569', // Clear separation between neighbouring states
             weight: 1.2,
             opacity: 1,
@@ -189,7 +189,7 @@ export const LocationView: React.FC = () => {
                 ${stateName}
               </div>
               ${
-                metrics.hasData
+                metrics.isComparable && metrics.gapCategory !== 'UNAVAILABLE'
                   ? `
                 <div style="display: flex; gap: 8px; border-top: 1px solid #CBD5E1; padding-top: 3px; font-size: 10px;">
                   <span>Demand: <strong>${formatNumber(metrics.totalDemand)}</strong></span>
@@ -210,6 +210,18 @@ export const LocationView: React.FC = () => {
                       : '#047857'
                   };">
                     ${metrics.gapLabel}
+                  </span>
+                </div>
+              `
+                  : metrics.totalDemand > 0
+                  ? `
+                <div style="border-top: 1px solid #CBD5E1; padding-top: 3px; font-size: 10px;">
+                  <span>Demand: <strong>${formatNumber(metrics.totalDemand)}</strong></span>
+                  <span style="color: #64748B; margin-left: 6px;">Workforce: <em>Unfiled</em></span>
+                </div>
+                <div style="margin-top: 3px;">
+                  <span style="font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1;">
+                    ⚪ ${metrics.gapLabel}
                   </span>
                 </div>
               `
@@ -281,10 +293,10 @@ export const LocationView: React.FC = () => {
             const color = getCategoryColor(metrics.gapCategory);
 
             return {
-              fillColor: isSelected ? '#F59E0B' : color,
-              fillOpacity: isSelected ? 0.95 : metrics.hasData ? 0.85 : 0.55,
-              color: isSelected ? '#78350F' : '#64748B',
-              weight: isSelected ? 2.5 : 1,
+              fillColor: color, // NEVER force orange! Preserves true data status: Green, Orange, Red, or White/Grey
+              fillOpacity: isSelected ? 0.95 : metrics.gapCategory !== 'UNAVAILABLE' ? 0.85 : 0.45,
+              color: isSelected ? '#0F172A' : '#64748B', // High-contrast border outline for selected district
+              weight: isSelected ? 3 : 1,
               opacity: 1,
             };
           },
@@ -298,7 +310,7 @@ export const LocationView: React.FC = () => {
                   ${districtName}, ${selectedState}
                 </div>
                 ${
-                  metrics.hasData
+                  metrics.isComparable && metrics.gapCategory !== 'UNAVAILABLE'
                     ? `
                   <div style="display: flex; gap: 8px; border-top: 1px solid #CBD5E1; padding-top: 3px; font-size: 10px;">
                     <span>Demand: <strong>${formatNumber(metrics.totalDemand)}</strong></span>
@@ -319,6 +331,18 @@ export const LocationView: React.FC = () => {
                         : '#047857'
                     };">
                       ${metrics.gapLabel}
+                    </span>
+                  </div>
+                `
+                    : metrics.totalDemand > 0
+                    ? `
+                  <div style="border-top: 1px solid #CBD5E1; padding-top: 3px; font-size: 10px;">
+                    <span>Demand: <strong>${formatNumber(metrics.totalDemand)}</strong></span>
+                    <span style="color: #64748B; margin-left: 6px;">Workforce: <em>Unfiled</em></span>
+                  </div>
+                  <div style="margin-top: 3px;">
+                    <span style="font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1;">
+                      ⚪ ${metrics.gapLabel}
                     </span>
                   </div>
                 `
@@ -641,19 +665,19 @@ export const LocationView: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600">
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>
-                <span>🟢 Lower gap</span>
+                <span>🟢 Lower Gap</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>
-                <span>🟡 Moderate gap</span>
+                <span>🟠 Moderate Gap</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>
-                <span>🔴 Higher gap</span>
+                <span>🔴 Higher Gap</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-slate-200 border border-slate-400 shrink-0"></span>
-                <span>⚪ Data unavailable</span>
+                <span>⚪ Data Unavailable / Non-Comparable</span>
               </div>
             </div>
           </div>
@@ -683,35 +707,56 @@ export const LocationView: React.FC = () => {
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                     <span className="text-[10px] text-slate-500 block">Job Demand</span>
                     <span className="font-mono font-bold text-indigo-600 text-base tabular-nums">
-                      {formatNumber(currentMetrics.totalDemand)}
+                      {currentMetrics.totalDemand > 0 ? formatNumber(currentMetrics.totalDemand) : 'Unavailable'}
                     </span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">vacancies</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      {currentMetrics.totalDemand > 0 ? 'vacancies' : 'no active filings'}
+                    </span>
                   </div>
 
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                     <span className="text-[10px] text-slate-500 block">Available Workforce</span>
                     <span className="font-mono font-bold text-slate-900 text-base tabular-nums">
-                      {formatNumber(currentMetrics.totalWorkers)}
+                      {currentMetrics.isComparable && currentMetrics.totalWorkers > 0
+                        ? formatNumber(currentMetrics.totalWorkers)
+                        : 'Unfiled'}
                     </span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">registered seekers</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      {currentMetrics.isComparable && currentMetrics.totalWorkers > 0
+                        ? 'comparable seekers'
+                        : 'comparable registry unfiled'}
+                    </span>
                   </div>
 
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                     <span className="text-[10px] text-slate-500 block">Potential Skill Gap</span>
-                    <span
-                      className={`font-mono font-bold text-base tabular-nums block ${
-                        currentMetrics.gapCategory === 'HIGH_SHORTAGE'
-                          ? 'text-rose-600'
-                          : currentMetrics.gapCategory === 'MODERATE_SHORTAGE'
-                          ? 'text-amber-600'
-                          : 'text-emerald-600'
-                      }`}
-                    >
-                      {currentMetrics.gap > 0 ? `-${formatNumber(currentMetrics.gap)}` : `+${formatNumber(Math.abs(currentMetrics.gap))}`}
-                    </span>
-                    <span className="text-[10px] text-slate-500 block mt-0.5">
-                      {currentMetrics.gapPercentage}% {currentMetrics.gap > 0 ? 'deficit' : 'surplus'}
-                    </span>
+                    {currentMetrics.isComparable && currentMetrics.gap !== null ? (
+                      <>
+                        <span
+                          className={`font-mono font-bold text-base tabular-nums block ${
+                            currentMetrics.gapCategory === 'HIGH_SHORTAGE'
+                              ? 'text-rose-600'
+                              : currentMetrics.gapCategory === 'MODERATE_SHORTAGE'
+                              ? 'text-amber-600'
+                              : 'text-emerald-600'
+                          }`}
+                        >
+                          {currentMetrics.gap > 0 ? `-${formatNumber(currentMetrics.gap)}` : `+${formatNumber(Math.abs(currentMetrics.gap))}`}
+                        </span>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          {currentMetrics.gapPercentage}% {currentMetrics.gap > 0 ? 'deficit' : 'surplus'}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-slate-400 text-sm block">
+                          Cannot calculate
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          Data unfiled / non-comparable
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
