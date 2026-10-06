@@ -6,6 +6,7 @@ import { MasterSectorSelect } from '../components/MasterSectorSelect';
 import { DataCoverageCard } from '../components/DataCoverageCard';
 import { checkDataCoverage } from '../utils/dataAvailability';
 import { Users, GraduationCap, Building2, CheckCircle2, Filter, Award, MapPin, Info } from 'lucide-react';
+import { TelanganaCoverageWarning } from '../components/TelanganaCoverageWarning';
 
 export const SupplyView: React.FC = () => {
   const [supplyData, setSupplyData] = useState<any>(null);
@@ -189,6 +190,12 @@ export const SupplyView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Telangana Coverage Notice */}
+      <TelanganaCoverageWarning
+        selectedState={selectedState}
+        selectedDistrict={selectedDistrict}
+      />
 
       {/* Coverage Card */}
       {selectedDistrict && coverage && (

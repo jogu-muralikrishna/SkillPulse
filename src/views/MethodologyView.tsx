@@ -237,7 +237,7 @@ export const MethodologyView: React.FC = () => {
               <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1.5">
                 <span className="font-bold text-slate-900 block">Potential Skill Gap</span>
                 <code className="text-[11px] text-indigo-700 bg-indigo-50/70 px-2 py-1 rounded block font-mono">
-                  Gap = Demand - Supply_eff
+                  Net Gap = Demand - Effective Supply
                 </code>
                 <p className="text-[11px] text-slate-600">
                   Evaluated strictly on identical spatial and temporal boundaries. Positive numbers indicate shortages (&gt;+15%); negative indicate surpluses (&lt;-15%).
@@ -253,6 +253,16 @@ export const MethodologyView: React.FC = () => {
                   Evaluated using MAE, RMSE, and R² variance with Student's t distribution confidence intervals. Requires n ≥ 4 historical periods.
                 </p>
               </div>
+            </div>
+
+            <div className="p-3.5 bg-amber-50/80 rounded-xl border border-amber-200 space-y-1.5 text-amber-950">
+              <span className="font-bold block text-xs">Future Demand-Index Pipeline Specification</span>
+              <p className="text-[11px] leading-relaxed text-amber-900">
+                <strong>Current Status:</strong> The platform currently calculates skill gaps using the direct formula: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">Net Gap = Demand - Effective Supply</code>.
+              </p>
+              <p className="text-[11px] leading-relaxed text-amber-900">
+                <strong>Intended Future Pipeline:</strong> An automated ingestion pipeline is designed to combine official NCS vacancy reports with validated public postings, deduplicate repeat postings across portal feeds, and normalize raw keywords into NCO-2015 competency vectors. This composite index pipeline is currently in architectural specification and is <em>not yet operating in production</em>.
+              </p>
             </div>
 
             <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-200">

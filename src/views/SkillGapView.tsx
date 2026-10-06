@@ -6,6 +6,7 @@ import { MasterSectorSelect } from '../components/MasterSectorSelect';
 import { DataCoverageCard } from '../components/DataCoverageCard';
 import { checkDataCoverage } from '../utils/dataAvailability';
 import { Scale, Filter, ShieldAlert, MapPin, Info } from 'lucide-react';
+import { TelanganaCoverageWarning } from '../components/TelanganaCoverageWarning';
 import { SkillGapAnalysis, GapClassification } from '../types';
 
 export const SkillGapView: React.FC = () => {
@@ -205,6 +206,12 @@ export const SkillGapView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Telangana Coverage Warning */}
+      <TelanganaCoverageWarning
+        selectedState={selectedState}
+        selectedDistrict={selectedDistrict}
+      />
 
       {/* Coverage Card */}
       {selectedDistrict && coverage && (

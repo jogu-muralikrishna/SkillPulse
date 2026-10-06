@@ -11,6 +11,8 @@ import { WhatIfSimulatorView } from './views/WhatIfSimulatorView';
 import { SkillPriorityView } from './views/SkillPriorityView';
 import { LocationView } from './views/LocationView';
 import { AssistantView } from './views/AssistantView';
+import { MethodologyView } from './views/MethodologyView';
+import { DataSourcesView } from './views/DataSourcesView';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<string>('dashboard');
@@ -22,11 +24,9 @@ export default function App() {
   }>({});
 
   const handleNavigate = (view: string, params?: any) => {
-    // If user attempted to navigate to an unlisted/removed technical page, redirect gracefully to dashboard
-    if (['normalization', 'data-sources', 'methodology', 'sources'].includes(view)) {
-      setCurrentView('dashboard');
-      return;
-    }
+    // Canonical alias mapping
+    if (view === 'sources') view = 'data-sources';
+
     setCurrentView(view);
     if (view === 'simulator' && params) {
       setSimulatorParams(params);
@@ -68,6 +68,10 @@ export default function App() {
         return <LocationView />;
       case 'assistant':
         return <AssistantView />;
+      case 'methodology':
+        return <MethodologyView />;
+      case 'data-sources':
+        return <DataSourcesView />;
       default:
         return <DashboardView onNavigate={handleNavigate} />;
     }

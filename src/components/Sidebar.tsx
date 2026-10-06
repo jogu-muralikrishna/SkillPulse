@@ -216,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* SkillPulse Assistant */}
-          <div className="pt-2 border-t border-slate-800">
+          <div className="pt-2 border-t border-slate-800 space-y-1">
             <button
               onClick={() => {
                 onNavigate('assistant');
@@ -230,6 +230,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Bot className="w-4 h-4 text-indigo-400 shrink-0" />
               <span>SkillPulse Assistant</span>
+            </button>
+          </div>
+
+          {/* Reference & Methodology */}
+          <div className="pt-2 border-t border-slate-800 space-y-1">
+            <button
+              onClick={() => {
+                onNavigate('methodology');
+                onCloseMobile();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-lg transition-colors text-left cursor-pointer ${
+                currentView === 'methodology'
+                  ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                  : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
+              }`}
+            >
+              <span>Methodology & Limits</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('data-sources');
+                onCloseMobile();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-lg transition-colors text-left cursor-pointer ${
+                currentView === 'data-sources'
+                  ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                  : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
+              }`}
+            >
+              <span>Data Sources Catalog</span>
             </button>
           </div>
         </div>

@@ -108,12 +108,17 @@ export type DatasetVerificationStatus =
 
 export interface RecordProvenance {
   source_name: string;
+  source_url?: string;
+  access_date?: string;
   dataset_name: string;
   resource_name?: string;
   source_period: string;
   geography_level: GeographyLevel;
   source_identifier?: string;
   verification_status: 'VERIFIED_INGESTED' | 'REQUIRES_VERIFICATION' | 'UNVERIFIED';
+  labour_definition?: string;
+  is_development_fixture?: boolean;
+  limitations?: string[];
   ingestion_date: string;
   is_forecast: boolean;
   notes?: string;

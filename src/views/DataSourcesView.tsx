@@ -13,9 +13,9 @@ export const DataSourcesView: React.FC = () => {
       name: 'Local Government Directory (LGD)',
       organization: 'Ministry of Panchayati Raj, Government of India',
       usedFor: 'Official list of States and Districts across India',
-      coverage: 'All 36 States & Union Territories, and all 786 Districts (100% active)',
+      coverage: 'All 36 States & Union Territories, and all 786 Districts (100% active administrative master)',
       latestDate: 'Current Official Gazette',
-      lastChecked: 'Audited Today',
+      lastChecked: '2026-10-04',
       status: 'Verified & Ingested',
       officialUrl: 'https://lgdirectory.gov.in/',
       catalogUrl: 'https://data.gov.in/catalog/local-government-directory-lgd'
@@ -25,10 +25,10 @@ export const DataSourcesView: React.FC = () => {
       name: 'National Career Service (NCS)',
       organization: 'Ministry of Labour & Employment, Government of India',
       usedFor: 'Labour demand, job vacancies, and active hiring indicators',
-      coverage: 'Development sample across 8 industrial clusters (101 records in test mode)',
+      coverage: 'Development sample across 8 industrial clusters (101 testing fixtures in repo; Telangana demand covers Hyderabad only)',
       latestDate: '2023-2024 Observed (Projections Flagged)',
-      lastChecked: 'Audited Today',
-      status: 'Requires Verification (Dev Sample)',
+      lastChecked: '2026-10-04',
+      status: 'Requires Verification (Dev Fixtures)',
       officialUrl: 'https://www.ncs.gov.in/',
       catalogUrl: 'https://www.data.gov.in/'
     },
@@ -37,10 +37,10 @@ export const DataSourcesView: React.FC = () => {
       name: 'e-Shram National Database',
       organization: 'Ministry of Labour & Employment, Government of India',
       usedFor: 'Registered unorganised workforce counts by occupation sector',
-      coverage: 'Resource identified; 0 production records ingested awaiting source file validation',
-      latestDate: 'Mid-2024 Published Registry',
-      lastChecked: 'Audited Today',
-      status: 'Resource Identified — Pending Ingestion',
+      coverage: '15 district-level unorganised records in repo across 7 districts (Telangana supply covers Hyderabad, Rangareddy, Medchal-Malkajgiri)',
+      latestDate: '2026-Q3 (Parliamentary Disclosures)',
+      lastChecked: '2026-10-04',
+      status: 'Curated Disclosures (Pending Raw Dump)',
       officialUrl: 'https://eshram.gov.in/',
       catalogUrl: 'https://eshram.gov.in/dashboard'
     },
@@ -49,10 +49,10 @@ export const DataSourcesView: React.FC = () => {
       name: 'Ministry of Skill Development & Entrepreneurship (MSDE)',
       organization: 'Government Open Data Platform / MSDE / NSDC',
       usedFor: 'Accredited training candidates enrolled, trained, and certified',
-      coverage: 'Resource identified; 0 production records ingested awaiting spreadsheet validation',
-      latestDate: 'FY 2023-24 Scheme Disclosures',
-      lastChecked: 'Audited Today',
-      status: 'Resource Identified — Pending Ingestion',
+      coverage: '14 district-level training records across 4 industrial districts (Hyderabad, Pune, Bengaluru Urban, Visakhapatnam)',
+      latestDate: 'FY 2024-25 Scheme Disclosures',
+      lastChecked: '2026-10-04',
+      status: 'Curated Disclosures (PMKK Centers)',
       officialUrl: 'https://www.msde.gov.in/',
       catalogUrl: 'https://www.data.gov.in/'
     }
@@ -92,7 +92,7 @@ export const DataSourcesView: React.FC = () => {
             <span>Official Data Sources</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
-            SkillPulse uses official government open datasets. We never create imaginary or estimated numbers when official records are unfiled.
+            SkillPulse references official government open datasets and curated pilot disclosures. Where data is unfiled or in development fixture mode, coverage limits are transparently stated.
           </p>
         </div>
 

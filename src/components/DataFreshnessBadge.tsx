@@ -96,14 +96,14 @@ export const DataFreshnessBadge: React.FC<DataFreshnessBadgeProps> = ({
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 text-xs">
             <span className="font-semibold text-emerald-950">
-              Data updated through:
+              Last updated:
             </span>
             <span className="font-bold text-emerald-800">
-              September 2026
+              2026-Q3
             </span>
             <span className="hidden sm:inline text-emerald-600">•</span>
             <span className="text-[11px] text-emerald-700 hidden md:inline">
-              NCS & e-Shram verified
+              Snapshot
             </span>
           </div>
 

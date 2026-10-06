@@ -17,15 +17,49 @@ export interface ProvenanceDatasetEntry {
   dataGovCatalogUrl?: string;
   referencePublication: string;
   referenceDate: string;
-  populationScope: 'UNORGANISED_WORKFORCE' | 'FORMAL_JOBSEEKERS' | 'ACCREDITED_TRAINEES' | 'CANONICAL_GEOGRAPHY';
+  accessDate: string;
+  populationScope: 'UNORGANISED_WORKFORCE' | 'FORMAL_JOBSEEKERS' | 'ACCREDITED_TRAINEES' | 'CANONICAL_GEOGRAPHY' | 'FORMAL_LABOUR_DEMAND';
   geographyLevel: 'STATE' | 'DISTRICT' | 'NATIONAL';
   verifiedDistrictsCovered: string[];
   recordsCount: number;
+  isDevelopmentFixture: boolean;
+  verificationStatus: 'VERIFIED_INGESTED' | 'REQUIRES_VERIFICATION' | 'UNVERIFIED';
   dataLimitations: string[];
   comparabilityGuidance: string;
 }
 
 export const DATA_PROVENANCE_CATALOG: Record<string, ProvenanceDatasetEntry> = {
+  ncs_demand: {
+    id: 'ncs_demand',
+    sourceOrganization: 'Ministry of Labour & Employment (MoLE), Government of India / National Career Service',
+    officialPortalUrl: 'https://www.ncs.gov.in/',
+    dataGovCatalogUrl: 'https://www.data.gov.in/',
+    referencePublication: 'NCS Monthly Vacancies Bulletin & Public Job Market Research Listings',
+    referenceDate: '2024-Q4',
+    accessDate: '2026-10-04',
+    populationScope: 'FORMAL_LABOUR_DEMAND',
+    geographyLevel: 'DISTRICT',
+    verifiedDistrictsCovered: [
+      'Hyderabad (Telangana)',
+      'Bengaluru Urban (Karnataka)',
+      'Pune (Maharashtra)',
+      'Chennai (Tamil Nadu)',
+      'Ahmedabad (Gujarat)',
+      'Central Delhi (Delhi)',
+      'Visakhapatnam (Andhra Pradesh)',
+      'Gautam Buddha Nagar (Uttar Pradesh)'
+    ],
+    recordsCount: 101,
+    isDevelopmentFixture: true,
+    verificationStatus: 'REQUIRES_VERIFICATION',
+    dataLimitations: [
+      'Current 101 demand records are development/testing fixtures and are NOT backed by raw source files in this repository.',
+      'Periods from 2025 onwards (2025-Q1 through 2026-Q3) are forward projections tagged as forecasts, not observed government filings.',
+      'Telangana demand currently represents Hyderabad district only (1 out of 33 districts in Telangana).',
+      'Reflects formal corporate vacancies and technical postings; does not represent total unorganised labor demand.'
+    ],
+    comparabilityGuidance: 'Formal tech vacancies (e.g. Python, Generative AI) cannot be compared against unorganised worker registries (e-Shram). Cross-population comparisons must be flagged as NON_COMPARABLE.'
+  },
   eshram_registry: {
     id: 'eshram_registry',
     sourceOrganization: 'Ministry of Labour & Employment (MoLE), Government of India',
@@ -33,6 +67,7 @@ export const DATA_PROVENANCE_CATALOG: Record<string, ProvenanceDatasetEntry> = {
     dataGovCatalogUrl: 'https://www.data.gov.in/catalog/demographic-data-unorganised-workers-registered-eshram-portal',
     referencePublication: 'Parliamentary Unstarred Questions (Rajya Sabha July 24, 2025; Lok Sabha July 14, 2026) & PIB National Releases',
     referenceDate: '2026-07-14',
+    accessDate: '2026-10-04',
     populationScope: 'UNORGANISED_WORKFORCE',
     geographyLevel: 'DISTRICT',
     verifiedDistrictsCovered: [
@@ -45,6 +80,8 @@ export const DATA_PROVENANCE_CATALOG: Record<string, ProvenanceDatasetEntry> = {
       'Ahmedabad (Gujarat)'
     ],
     recordsCount: 15,
+    isDevelopmentFixture: false,
+    verificationStatus: 'VERIFIED_INGESTED',
     dataLimitations: [
       'e-Shram registers unorganised workers (construction, agriculture, informal technical services, domestic, logistics).',
       'e-Shram does NOT track formal corporate IT/software engineering occupations (Python, Generative AI, VLSI Physical Design).',
@@ -61,6 +98,7 @@ export const DATA_PROVENANCE_CATALOG: Record<string, ProvenanceDatasetEntry> = {
     dataGovCatalogUrl: 'https://www.skillindiadigital.gov.in/',
     referencePublication: 'Skill India Digital Hub (SIDH) / Lok Sabha Unstarred Question No. 3504 (10.08.2026) & MSDE Official Center Disclosures',
     referenceDate: '2026-08-10',
+    accessDate: '2026-10-04',
     populationScope: 'ACCREDITED_TRAINEES',
     geographyLevel: 'DISTRICT',
     verifiedDistrictsCovered: [
@@ -70,6 +108,8 @@ export const DATA_PROVENANCE_CATALOG: Record<string, ProvenanceDatasetEntry> = {
       'Pune (Maharashtra)'
     ],
     recordsCount: 14,
+    isDevelopmentFixture: false,
+    verificationStatus: 'VERIFIED_INGESTED',
     dataLimitations: [
       'Under PMKVY 4.0 (effective FY 2022-23 onwards), the mandatory placement tracking was delinked to emphasize short-term training and on-the-job orientation (OJT).',
       'Where official disclosures do not report certifiedCount or placedCount, fields remain strictly null/undefined.',
@@ -86,10 +126,13 @@ export const DATA_PROVENANCE_CATALOG: Record<string, ProvenanceDatasetEntry> = {
     dataGovCatalogUrl: 'https://www.data.gov.in/catalog/local-government-directory-lgd',
     referencePublication: 'Local Government Directory (LGD) Master Repository (28 States, 8 UTs, 786 Districts)',
     referenceDate: '2026-10-04',
+    accessDate: '2026-10-04',
     populationScope: 'CANONICAL_GEOGRAPHY',
     geographyLevel: 'DISTRICT',
     verifiedDistrictsCovered: ['All 786 official Districts across all 36 States and Union Territories'],
     recordsCount: 786,
+    isDevelopmentFixture: false,
+    verificationStatus: 'VERIFIED_INGESTED',
     dataLimitations: [
       'Establishes administrative baseline. Existence of an LGD district does NOT imply presence of labour filings.',
       'Missing labour records in an LGD district are strictly preserved as "Unavailable", never converted to false zero counts.'

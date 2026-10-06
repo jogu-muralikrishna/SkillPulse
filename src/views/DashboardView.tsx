@@ -16,6 +16,7 @@ import {
   Filter,
   RotateCcw
 } from 'lucide-react';
+import { TelanganaCoverageWarning } from '../components/TelanganaCoverageWarning';
 import {
   ResponsiveContainer,
   XAxis,
@@ -181,6 +182,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {/* Telangana Coverage Notice */}
+      <TelanganaCoverageWarning
+        selectedState={selectedState}
+        selectedDistrict={selectedDistrict}
+      />
 
       {loading ? (
         <div className="space-y-6 animate-pulse">

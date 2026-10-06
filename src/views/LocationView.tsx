@@ -19,6 +19,7 @@ import {
   Search,
   Check
 } from 'lucide-react';
+import { TelanganaCoverageWarning } from '../components/TelanganaCoverageWarning';
 import { MASTER_STATES, getDistrictsForState } from '../data/masterGeography';
 import { SECTORS, INITIAL_SKILL_MAPPINGS } from '../data/skillsTaxonomy';
 import { formatNumber } from '../utils/numberFormatter';
@@ -623,6 +624,12 @@ export const LocationView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Telangana Coverage Warning */}
+      <TelanganaCoverageWarning
+        selectedState={selectedState}
+        selectedDistrict={selectedDistrict}
+      />
 
       {/* Main Grid: India Administrative Map on Left, Selected Location on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

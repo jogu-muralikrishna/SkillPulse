@@ -195,10 +195,20 @@ export const DEMAND_RECORDS: DemandRecord[] = RAW_DEMAND_FIXTURES.map(rec => ({
   is_forecast: rec.year >= 2025,
   provenance: {
     source_name: 'National Career Service (Reported/Pending Audit)',
+    source_url: 'https://www.ncs.gov.in/',
+    access_date: '2026-10-04',
     dataset_name: 'Industrial Demand Fixture (Development/Testing)',
     source_period: rec.period,
     geography_level: 'DISTRICT',
     verification_status: 'REQUIRES_VERIFICATION',
+    labour_definition: 'Reported formal vacancies and active hiring indicators in corporate and tech sectors',
+    is_development_fixture: true,
+    limitations: [
+      'Development & testing fixture; not supported by raw source files in repository',
+      'Extrapolated forward quarters (>=2025) are projections rather than observed government filings',
+      'Telangana demand covers Hyderabad only (1 of 33 districts)',
+      'Covers 8 urban industrial hubs only, not pan-India coverage'
+    ],
     ingestion_date: '2026-10-04',
     is_forecast: rec.year >= 2025,
     notes: 'Development & testing fixture. Awaiting primary source provenance audit. Not to be cited as official verified filings or national coverage.'

@@ -21,7 +21,7 @@ import { TrainingRecord } from '../types';
  * ============================================================================
  */
 
-export const TRAINING_RECORDS: TrainingRecord[] = [
+const RAW_TRAINING_RECORDS: TrainingRecord[] = [
   // 1. Telangana -> Hyderabad (Official MSDE PMKVY Trained Candidates FY 2020-21)
   {
     id: 'tr-pmkvy-in-tg-04-agg-2020_21',
@@ -470,3 +470,26 @@ export const TRAINING_RECORDS: TrainingRecord[] = [
     }
   }
 ];
+
+export const TRAINING_RECORDS: TrainingRecord[] = RAW_TRAINING_RECORDS.map(rec => ({
+  ...rec,
+  provenance: {
+    source_name: rec.provenance?.source_name || 'Ministry of Skill Development & Entrepreneurship (MSDE)',
+    source_url: 'https://www.msde.gov.in/',
+    access_date: '2026-10-04',
+    dataset_name: rec.provenance?.dataset_name || 'PMKVY Training Disclosures',
+    source_period: rec.provenance?.source_period || rec.period,
+    geography_level: rec.geography_level || 'DISTRICT',
+    verification_status: rec.provenance?.verification_status || 'VERIFIED_INGESTED',
+    labour_definition: 'Accredited candidate training completions and institutional center capacities under PMKVY schemes',
+    is_development_fixture: false,
+    limitations: [
+      'Under PMKVY 4.0, placement tracking was delinked by MSDE; placement counts remain undefined where unmeasured',
+      'Training output reflects accredited short-term course cohorts, not total vocational/diploma education',
+      'Accredited center coverage restricted to verified PMKK locations (Hyderabad, Pune, Bengaluru Urban, Visakhapatnam)'
+    ],
+    ingestion_date: rec.provenance?.ingestion_date || '2026-10-04',
+    is_forecast: false,
+    notes: rec.provenance?.notes || ''
+  }
+}));

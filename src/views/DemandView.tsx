@@ -7,6 +7,7 @@ import { DataCoverageCard } from '../components/DataCoverageCard';
 import { checkDataCoverage } from '../utils/dataAvailability';
 import { formatPeriodToHuman } from '../utils/dateFormatter';
 import { Filter, Briefcase, TrendingUp, Layers, MapPin, Calendar, Search, Sparkles } from 'lucide-react';
+import { TelanganaCoverageWarning } from '../components/TelanganaCoverageWarning';
 import {
   ResponsiveContainer,
   BarChart,
@@ -220,6 +221,12 @@ export const DemandView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Telangana Coverage Notice */}
+      <TelanganaCoverageWarning
+        selectedState={selectedState}
+        selectedDistrict={selectedDistrict}
+      />
 
       {/* District Data Coverage Indicator */}
       {selectedDistrict && coverage && (

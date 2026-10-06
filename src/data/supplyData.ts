@@ -19,7 +19,7 @@ import { SupplyWorkerRecord } from '../types';
  * ============================================================================
  */
 
-export const SUPPLY_WORKER_RECORDS: SupplyWorkerRecord[] = [
+const RAW_SUPPLY_WORKER_RECORDS: SupplyWorkerRecord[] = [
   // 1. Andhra Pradesh -> Visakhapatnam (Official District Unorganised Aggregate)
   {
     id: 'sw-eshram-in-ap-23-agg-2025q3',
@@ -38,10 +38,20 @@ export const SUPPLY_WORKER_RECORDS: SupplyWorkerRecord[] = [
     source: 'Ministry of Labour & Employment - e-Shram National Worker Database (Rajya Sabha Written Reply July 24, 2025)',
     provenance: {
       source_name: 'Ministry of Labour & Employment - e-Shram',
+      source_url: 'https://eshram.gov.in/',
+      access_date: '2026-10-04',
       dataset_name: 'District Unorganised Worker Registry',
       source_period: '2025-Q3',
       geography_level: 'DISTRICT',
       verification_status: 'VERIFIED_INGESTED',
+      labour_definition: 'Registered unorganised workers under e-Shram; does not track formal corporate IT/engineering workforce',
+      is_development_fixture: false,
+      limitations: [
+        'e-Shram registers unorganised workers (informal technical services, construction, logistics)',
+        'Does not track formal corporate IT engineers (Python, GenAI, VLSI)',
+        'Telangana supply covers only 3 of 33 districts (Hyderabad, Rangareddy, Medchal-Malkajgiri)',
+        'District skill counts are based on parliamentary replies and occupational approximations'
+      ],
       ingestion_date: '2026-10-04',
       is_forecast: false,
       notes: 'Official unorganised workers registered in Visakhapatnam as of July 17, 2025 (Rajya Sabha Written Reply, MoLE).'
@@ -440,3 +450,27 @@ export const SUPPLY_WORKER_RECORDS: SupplyWorkerRecord[] = [
     }
   }
 ];
+
+export const SUPPLY_WORKER_RECORDS: SupplyWorkerRecord[] = RAW_SUPPLY_WORKER_RECORDS.map(rec => ({
+  ...rec,
+  provenance: {
+    source_name: rec.provenance?.source_name || 'Ministry of Labour & Employment - e-Shram',
+    source_url: rec.provenance?.source_url || 'https://eshram.gov.in/',
+    access_date: rec.provenance?.access_date || '2026-10-04',
+    dataset_name: rec.provenance?.dataset_name || 'District Unorganised Worker Registry',
+    source_period: rec.provenance?.source_period || rec.period,
+    geography_level: rec.geography_level || 'DISTRICT',
+    verification_status: rec.provenance?.verification_status || 'VERIFIED_INGESTED',
+    labour_definition: rec.provenance?.labour_definition || 'Registered unorganised workers under e-Shram; does not track formal corporate IT/engineering workforce',
+    is_development_fixture: rec.provenance?.is_development_fixture ?? false,
+    limitations: rec.provenance?.limitations || [
+      'e-Shram registers unorganised workers (informal technical services, construction, logistics)',
+      'Does not track formal corporate IT engineers (Python, GenAI, VLSI)',
+      'Telangana supply covers only 3 of 33 districts (Hyderabad, Rangareddy, Medchal-Malkajgiri)',
+      'District skill counts are based on parliamentary replies and occupational approximations'
+    ],
+    ingestion_date: rec.provenance?.ingestion_date || '2026-10-04',
+    is_forecast: rec.provenance?.is_forecast ?? false,
+    notes: rec.provenance?.notes || ''
+  }
+}));
