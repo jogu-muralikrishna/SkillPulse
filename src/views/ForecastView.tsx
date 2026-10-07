@@ -25,12 +25,14 @@ import { ForecastResult } from '../types';
 import {
   ResponsiveContainer,
   Line,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
   ComposedChart
 } from 'recharts';
+import { formatHeldOutMAPE } from '../utils/numberFormatter';
 
 interface ForecastViewProps {
   onNavigateToAssistant?: () => void;
@@ -45,6 +47,7 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
   const [forecast, setForecast] = useState<ForecastResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [showWhyResult, setShowWhyResult] = useState(false);
+  const [showMethodology, setShowMethodology] = useState(false);
 
   // Dynamically load skills that actually have historical demand records for the selected location
   const availableDemandSkills = useMemo(() => {
@@ -152,16 +155,34 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
     return points;
   }, [forecast]);
 
-  // Forecast Reliability: Calculated strictly from historical model fit metrics
-  const forecastReliability = useMemo(() => {
-    if (!forecast || !forecast.isAvailable) return 'Unavailable';
-    const r2 = forecast.metrics?.r2 ?? 0;
-    const sampleSize = forecast.technicalDetails?.sampleSize ?? 0;
-    if (sampleSize < 4) return 'Unavailable';
-    if (r2 >= 0.8 && sampleSize >= 6) return 'Good (Historical fit)';
-    if (r2 >= 0.5) return 'Moderate (Historical fit)';
-    return 'Limited (Historical fit)';
+  // Determine whether forecast was produced via fallback vs Python ML service
+  const isFallback = useMemo(() => {
+    if (!forecast) return false;
+    return Boolean(
+      forecast.validation?.fallback ||
+      forecast.modelUsed?.includes('Fallback') ||
+      forecast.modelUsed?.includes('OLS')
+    );
   }, [forecast]);
+
+  // Model Display Name: 'Holt-Winters', 'LightGBM', or 'OLS (Fallback)'
+  const selectedModelName = useMemo(() => {
+    if (!forecast || !forecast.isAvailable) return 'Unavailable';
+    if (isFallback) return 'OLS (Fallback)';
+    const techModel = forecast.technicalDetails?.selectedModel;
+    if (techModel) return techModel;
+    if (forecast.modelUsed?.includes('Holt-Winters')) return 'Holt-Winters';
+    if (forecast.modelUsed?.includes('LightGBM')) return 'LightGBM';
+    return 'Machine Learning';
+  }, [forecast, isFallback]);
+
+  // Held-out validation MAPE formatted strictly (e.g. 0.0463 -> 4.63%)
+  const heldOutMAPEFormatted = useMemo(() => {
+    if (!forecast || !forecast.isAvailable || isFallback) return null;
+    const mape = forecast.metrics?.heldOutMAPE ??
+      forecast.validation?.[selectedModelName === 'LightGBM' ? 'lightGBM' : 'holtWinters']?.heldOutMAPE;
+    return formatHeldOutMAPE(mape);
+  }, [forecast, isFallback, selectedModelName]);
 
   // Derived metrics for summary cards
   const summaryMetrics = useMemo(() => {
@@ -343,7 +364,7 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
           </div>
         </div>
       ) : !forecast?.isAvailable ? (
-        /* Insufficient Data State (Section 5 & 19) */
+        /* Insufficient Data State (Requirements 9 & 19) */
         <div className="bg-white p-8 rounded-xl border border-amber-200/90 shadow-xs text-center space-y-3">
           <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
             <AlertCircle className="w-6 h-6" />
@@ -356,11 +377,14 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
           </p>
           <div className="pt-2 text-xs text-slate-600 font-medium space-y-1">
             <p>
-              Historical records available: <strong className="text-slate-900">{forecast?.historicalData.length || 0}</strong>
+              Historical records available: <strong className="text-slate-900">{forecast?.historicalData?.length || 0}</strong>
             </p>
             <p className="text-slate-500">
-              Minimum required for statistical trend estimation: <strong className="text-slate-700">4 quarters</strong>
+              Minimum required for statistical & ML time-series forecasting: <strong className="text-slate-700">4 chronological quarters</strong>
             </p>
+          </div>
+          <div className="p-3 bg-amber-50/70 border border-amber-200/80 text-amber-900 rounded-lg text-xs max-w-md mx-auto">
+            Missing data is not zero. We never fabricate synthetic projections when historical data is absent or insufficient.
           </div>
         </div>
       ) : (
@@ -417,25 +441,34 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
                 </span>
               </div>
 
-              {/* 4. Forecast Reliability */}
+              {/* 4. Forecasting Model & Validation */}
               <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs space-y-1">
                 <span className="text-xs text-slate-500 font-medium block">
-                  Forecast Reliability
+                  {isFallback ? 'Forecasting Model' : 'Model & Validation'}
                 </span>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <CheckCircle2
-                    className={`w-4 h-4 ${
-                      forecastReliability.includes('Good')
-                        ? 'text-emerald-600'
-                        : forecastReliability.includes('Moderate')
-                        ? 'text-amber-600'
-                        : 'text-slate-400'
-                    }`}
-                  />
-                  <span className="text-base font-bold text-slate-900">{forecastReliability}</span>
+                <div className="space-y-1 mt-1">
+                  <div className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                    <CheckCircle2
+                      className={`w-4 h-4 shrink-0 ${
+                        isFallback ? 'text-amber-500' : 'text-indigo-600'
+                      }`}
+                    />
+                    <span>Model: {selectedModelName}</span>
+                  </div>
+                  {heldOutMAPEFormatted && !isFallback ? (
+                    <div className="text-xs font-semibold text-indigo-700">
+                      Held-out MAPE: <span className="font-mono">{heldOutMAPEFormatted}</span>
+                    </div>
+                  ) : isFallback ? (
+                    <div className="text-xs font-medium text-amber-700">
+                      Deterministic linear baseline
+                    </div>
+                  ) : null}
                 </div>
-                <span className="text-[10px] text-slate-400 block leading-tight">
-                  Evaluated across {summaryMetrics.observationsCount} verified historical quarters
+                <span className="text-[10px] text-slate-400 block leading-tight pt-0.5">
+                  {isFallback
+                    ? 'Python ML service unavailable; executed deterministic OLS baseline.'
+                    : 'Model selected using held-out validation MAPE.'}
                 </span>
               </div>
 
@@ -489,7 +522,7 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
             {showWhyResult && summaryMetrics && (
               <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/60 text-xs text-slate-700 space-y-2.5 animate-in fade-in">
                 <p className="leading-relaxed">
-                  You selected <strong>{forecast.normalizedSkill}</strong> in <strong>{forecast.district}, {forecast.state}</strong>. The system found <strong>{summaryMetrics.observationsCount}</strong> valid historical demand observations from <strong>{summaryMetrics.historicalRange}</strong>. Because sufficient comparable historical records were available (minimum 4 required), a forward estimate was calculated for the selected forecast period (<strong>{summaryMetrics.horizonLabel}</strong>).
+                  You selected <strong>{forecast.normalizedSkill}</strong> in <strong>{forecast.district}, {forecast.state}</strong>. The system evaluated <strong>{summaryMetrics.observationsCount}</strong> valid historical demand observations from <strong>{summaryMetrics.historicalRange}</strong>. Because sufficient comparable historical records were available (minimum 4 required), a forward estimate was produced by <strong>{selectedModelName}</strong> for the selected forecast period (<strong>{summaryMetrics.horizonLabel}</strong>).
                 </p>
                 <p className="leading-relaxed">
                   • <strong>Recent observed demand:</strong> Stands at <strong>{summaryMetrics.recentDemand.toLocaleString()} vacancies</strong> in {summaryMetrics.recentPeriod}.
@@ -498,13 +531,139 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
                   • <strong>Historical trend direction:</strong> The observed data demonstrates a <strong>{summaryMetrics.growthTrend.toLowerCase()}</strong> quarterly trajectory.
                 </p>
                 <p className="leading-relaxed">
-                  • <strong>Projected benchmark:</strong> Under current hiring momentum, employer demand is estimated to reach approximately <strong>{summaryMetrics.expectedDemand.toLocaleString()} vacancies</strong> by {summaryMetrics.expectedPeriod}, representing an estimated change of <strong>{summaryMetrics.growthPercent >= 0 ? `+${summaryMetrics.growthPercent}%` : `${summaryMetrics.growthPercent}%`}</strong> over the forecast horizon.
+                  • <strong>Projected benchmark:</strong> Employer demand is estimated to reach approximately <strong>{summaryMetrics.expectedDemand.toLocaleString()} vacancies</strong> by {summaryMetrics.expectedPeriod}, representing an estimated change of <strong>{summaryMetrics.growthPercent >= 0 ? `+${summaryMetrics.growthPercent}%` : `${summaryMetrics.growthPercent}%`}</strong> over the forecast horizon.
                 </p>
+                {heldOutMAPEFormatted && !isFallback && (
+                  <p className="leading-relaxed">
+                    • <strong>Out-of-sample validation:</strong> Model selected using held-out validation MAPE (<strong>{heldOutMAPEFormatted}</strong>).
+                  </p>
+                )}
+                {isFallback && (
+                  <p className="leading-relaxed text-amber-800">
+                    • <strong>Fallback Notice:</strong> The Python ML service was unavailable; executed deterministic Ordinary Least Squares (OLS) linear trend baseline.
+                  </p>
+                )}
               </div>
             )}
           </div>
 
-          {/* Dynamic Demand Trend & Future Projection Chart (Section 15, 16, 27) */}
+          {/* Forecasting Methodology & Validation Architecture (Requirements 7 & 14) */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowMethodology(!showMethodology)}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                  Forecasting Methodology & Validation Architecture
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-indigo-600 font-semibold">
+                <span>{showMethodology ? 'Hide methodology' : 'View methodology'}</span>
+                {showMethodology ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </button>
+
+            {showMethodology && (
+              <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/60 text-xs text-slate-700 space-y-3 animate-in fade-in">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                      1. Dual-Model Evaluation
+                    </span>
+                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                      Both <strong>Holt-Winters</strong> (Exponential Smoothing capturing trend and quarterly seasonality) and <strong>LightGBM</strong> (Gradient Boosted Trees with 4 lag features + quarter index) are evaluated simultaneously on historical demand series.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                      2. Deterministic Holdout Split
+                    </span>
+                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                      The last 2–3 quarters (or 1 quarter for 4–5 observations) are held out strictly for out-of-sample evaluation according to deterministic small-data safety rules. Holdout quarters are never seen during model training.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      3. Validation-Driven Selection
+                    </span>
+                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                      The candidate model achieving the <strong>lower held-out validation MAPE</strong> (Mean Absolute Percentage Error) is deterministically selected to generate the forward forecast.
+                    </p>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-sky-600"></span>
+                      4. 95% Prediction Interval Scale
+                    </span>
+                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                      Prediction bands are calculated via residual Root Mean Squared Error (<span className="font-mono">RMSE = sqrt((1/M) * sum(residual²))</span>) expanding across horizons: <span className="font-mono">margin = 1.96 * RMSE * sqrt(1 + (h-1)/4)</span>, strictly ensuring <span className="font-mono">lower95 &le; forecast &le; upper95</span>.
+                    </p>
+                  </div>
+                </div>
+
+                {forecast?.validation && !isFallback && (
+                  <div className="p-3 bg-white rounded-lg border border-indigo-200 space-y-2 mt-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
+                      <span>Model Candidate Validation Comparison</span>
+                      <span className="text-[11px] text-indigo-700 font-mono">
+                        Holdout Size: {forecast.validation.holdoutSize || 'N/A'} Quarters
+                      </span>
+                    </div>
+                    {forecast.validation.selectionReason && (
+                      <p className="text-[11px] text-indigo-950 bg-indigo-50/70 p-2 rounded border border-indigo-100 font-medium">
+                        {forecast.validation.selectionReason}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                      {forecast.validation.holtWinters && (
+                        <div className={`p-2 rounded border ${selectedModelName === 'Holt-Winters' ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950 font-medium' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                          <div className="font-bold">Holt-Winters {selectedModelName === 'Holt-Winters' ? '★ Selected' : ''}</div>
+                          <div>Held-out MAPE: {formatHeldOutMAPE(forecast.validation.holtWinters.heldOutMAPE)}</div>
+                          {forecast.validation.holtWinters.rmse !== undefined && (
+                            <div>RMSE: {forecast.validation.holtWinters.rmse}</div>
+                          )}
+                          {forecast.validation.holtWinters.notes && (
+                            <div className="text-[10px] text-slate-500 mt-0.5">{forecast.validation.holtWinters.notes}</div>
+                          )}
+                        </div>
+                      )}
+                      {forecast.validation.lightGBM && (
+                        <div className={`p-2 rounded border ${selectedModelName === 'LightGBM' ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950 font-medium' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                          <div className="font-bold">LightGBM {selectedModelName === 'LightGBM' ? '★ Selected' : ''}</div>
+                          <div>
+                            Held-out MAPE: {forecast.validation.lightGBM.isValid ? formatHeldOutMAPE(forecast.validation.lightGBM.heldOutMAPE) : 'N/A'}
+                          </div>
+                          {forecast.validation.lightGBM.rmse !== undefined && (
+                            <div>RMSE: {forecast.validation.lightGBM.rmse}</div>
+                          )}
+                          {forecast.validation.lightGBM.notes && (
+                            <div className="text-[10px] text-slate-500 mt-0.5">{forecast.validation.lightGBM.notes}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {isFallback && (
+                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-xs">
+                    <strong>OLS Baseline Fallback Active:</strong> The Python ML service was unreachable or timed out. SkillPulse executed the deterministic Ordinary Least Squares (OLS) linear trend baseline.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Dynamic Demand Trend & Future Projection Chart (Requirements 5, 6, 15) */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
@@ -512,7 +671,7 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
                   {forecast.normalizedSkill} — Demand Trend & Future Projection
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {forecast.district}, {forecast.state} • Historical observations with forward estimate
+                  {forecast.district}, {forecast.state} • Historical observations with forward {selectedModelName} estimate
                 </p>
               </div>
               <div className="flex items-center gap-4 text-xs text-slate-600">
@@ -520,10 +679,10 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
                   <span className="w-3 h-1 bg-indigo-600 rounded-full inline-block"></span> Observed Demand
                 </span>
                 <span className="flex items-center gap-1.5 font-medium text-sky-700">
-                  <span className="w-3 h-1 bg-sky-500 border-t border-dashed border-sky-500 inline-block"></span> Estimated Demand
+                  <span className="w-3 h-1 bg-sky-500 border-t border-dashed border-sky-500 inline-block"></span> {isFallback ? 'Linear Estimate' : 'ML Forecast'}
                 </span>
-                <span className="flex items-center gap-1.5 text-slate-400">
-                  <span className="w-3 h-0.5 bg-slate-300 inline-block"></span> Expected Range
+                <span className="flex items-center gap-1.5 text-slate-500">
+                  <span className="w-3 h-2 bg-sky-100 border border-slate-300 rounded-xs inline-block"></span> 95% Prediction Band
                 </span>
               </div>
             </div>
@@ -536,17 +695,40 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
                   <YAxis stroke="#64748B" fontSize={11} tickFormatter={(v) => v.toLocaleString()} />
                   <Tooltip
                     formatter={(value: any, name: any) => {
-                      if (value === null) return ['N/A', name || ''];
+                      if (value === null || value === undefined) return ['N/A', name || ''];
                       const labels: Record<string, string> = {
-                        historicalDemand: 'Observed Demand',
-                        predictedDemand: 'Estimated Demand',
-                        lowerBound: 'Expected Lower Range',
-                        upperBound: 'Expected Upper Range',
+                        historicalDemand: 'Actual Historical Demand',
+                        predictedDemand: isFallback ? 'OLS Linear Forecast' : `${selectedModelName} ML Forecast`,
+                        lowerBound: '95% Prediction Lower Bound',
+                        upperBound: '95% Prediction Upper Bound',
                       };
                       return [Number(value).toLocaleString(), labels[String(name)] || String(name)];
                     }}
                     labelFormatter={(label) => `Period: ${label}`}
                     contentStyle={{ backgroundColor: '#1E293B', color: '#FFF', borderRadius: '8px', fontSize: '12px' }}
+                  />
+                  {/* Shaded 95% Prediction Band Area */}
+                  <Area
+                    type="monotone"
+                    dataKey="upperBound"
+                    name="upperBound"
+                    stroke="#94A3B8"
+                    strokeDasharray="3 3"
+                    strokeWidth={1}
+                    fill="#E0F2FE"
+                    fillOpacity={0.45}
+                    connectNulls={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="lowerBound"
+                    name="lowerBound"
+                    stroke="#94A3B8"
+                    strokeDasharray="3 3"
+                    strokeWidth={1}
+                    fill="#FFFFFF"
+                    fillOpacity={0.9}
+                    connectNulls={false}
                   />
                   {/* Historical Solid Line (Observed Demand) */}
                   <Line
@@ -568,27 +750,55 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ onNavigateToAssistan
                     strokeDasharray="5 5"
                     dot={{ r: 4, fill: '#0284C7' }}
                   />
-                  {/* Confidence Interval Bands */}
-                  <Line
-                    type="monotone"
-                    dataKey="upperBound"
-                    name="upperBound"
-                    stroke="#CBD5E1"
-                    strokeWidth={1}
-                    strokeDasharray="2 2"
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="lowerBound"
-                    name="lowerBound"
-                    stroke="#CBD5E1"
-                    strokeWidth={1}
-                    strokeDasharray="2 2"
-                    dot={false}
-                  />
                 </ComposedChart>
               </ResponsiveContainer>
+            </div>
+
+            {/* Forecast Horizon & Values Breakdown (Requirements 5 & 15) */}
+            <div className="pt-3 border-t border-slate-100 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                    Forecast Horizon & Projected Values
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Horizon: {forecast.horizon || `${forecast.forecastData.length} Quarters`} • {selectedModelName} projections with 95% empirical prediction bands
+                  </p>
+                </div>
+                <div className="text-xs text-slate-600 font-medium">
+                  Model: <strong className="text-slate-900">{selectedModelName}</strong>
+                  {heldOutMAPEFormatted && !isFallback && (
+                    <span className="ml-2 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md font-mono text-[11px]">
+                      Held-out MAPE: {heldOutMAPEFormatted}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {forecast.forecastData.map((pt) => (
+                  <div key={pt.period} className="p-3 bg-slate-50/80 rounded-lg border border-slate-200/80 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-800">{pt.period}</span>
+                      <span className="text-[10px] text-slate-500 font-medium">{formatPeriodToHuman(pt.period, false)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-sky-800 font-medium block">
+                        {isFallback ? 'Linear Estimate' : 'ML Forecast'}
+                      </span>
+                      <span className="text-lg font-bold font-mono text-sky-900 tabular-nums">
+                        {pt.predictedDemand.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="pt-1 border-t border-slate-200/60 text-[10px] text-slate-500 flex items-center justify-between">
+                      <span>95% Band:</span>
+                      <span className="font-mono text-slate-700 font-medium">
+                        [{pt.lowerBound.toLocaleString()} – {pt.upperBound.toLocaleString()}]
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-500 leading-relaxed">
