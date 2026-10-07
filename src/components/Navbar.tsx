@@ -18,6 +18,9 @@ const VIEW_TITLES: Record<string, string> = {
   priority: 'Skill Priority Index',
   location: 'Geographic Map',
   assistant: 'SkillPulse Assistant',
+  normalization: 'Skill Normalization & NCO-2015 Mapping',
+  methodology: 'Methodology & Analytical Pipeline',
+  'data-sources': 'Data Sources & Provenance Catalog'
 };
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onOpenMobileMenu, onNavigate }) => {

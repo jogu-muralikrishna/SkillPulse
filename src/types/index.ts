@@ -149,7 +149,17 @@ export interface SkillMapping {
   sector: string;
   source: string;
   confidence: number; // 0 to 1
+  semanticConfidence?: number;
+  domainCompatibility?: number;
+  explanation?: string;
   isVerified: boolean;
+  ncoCode?: string;
+  ncoTitle?: string;
+  ncoFamily?: string;
+  matchStatus?: 'accepted' | 'needs_review';
+  embeddingProvider?: string;
+  embeddingModel?: string;
+  sourceUrl?: string;
 }
 
 export interface DemandRecord {

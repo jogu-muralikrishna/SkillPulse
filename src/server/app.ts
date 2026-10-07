@@ -27,6 +27,14 @@ import {
   resolveCanonicalDistrict,
   getGeographyDataDiagnostics
 } from '../utils/canonicalGeography';
+import {
+  matchSkill,
+  loadNcoIndex,
+  loadSkillEmbeddingsCache,
+  findBestNcoMatch,
+  MATCH_ACCEPTANCE_THRESHOLD
+} from '../utils/ncoMatchingService';
+import { SkillMapping } from '../types';
 
 dotenv.config();
 
@@ -588,12 +596,65 @@ router.post('/api/data-refresh/check', (req: Request, res: Response) => {
   }
 });
 
-// 11. Skill Normalization Mappings
+function enrichMappingsWithNco(mappings: SkillMapping[]): SkillMapping[] {
+  try {
+    const ncoIndex = loadNcoIndex();
+    const skillCache = loadSkillEmbeddingsCache();
+
+    return mappings.map((m) => {
+      const key = m.rawSkill.trim().toLowerCase();
+      const cached = skillCache.skills[key];
+      if (cached && Array.isArray(cached.vector)) {
+        const match = findBestNcoMatch(cached.vector, ncoIndex, { sector: m.sector });
+        return {
+          ...m,
+          ncoCode: match.occupation.code,
+          ncoTitle: match.occupation.title,
+          ncoFamily: match.occupation.family,
+          confidence: match.confidence,
+          semanticConfidence: match.semanticConfidence,
+          domainCompatibility: match.domainCompatibility,
+          explanation: match.explanation,
+          matchStatus: match.confidence >= MATCH_ACCEPTANCE_THRESHOLD ? 'accepted' : 'needs_review',
+          embeddingProvider: 'gemini',
+          embeddingModel: 'gemini-embedding-2',
+          sourceUrl: match.occupation.sourceUrl
+        };
+      }
+      return m;
+    });
+  } catch (err) {
+    console.warn('[app.ts] Could not enrich mappings with NCO data:', err);
+    return mappings;
+  }
+}
+
+// 11. Skill Normalization Mappings & Semantic NCO Matching
 router.get('/skills/mappings', (req: Request, res: Response) => {
   try {
-    res.json({ mappings: currentSkillMappings });
+    const enriched = enrichMappingsWithNco(currentSkillMappings);
+    res.json({ mappings: enriched });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to fetch mappings' });
+  }
+});
+
+router.post('/skills/match', async (req: Request, res: Response) => {
+  try {
+    const skill = req.body?.skill || req.body?.rawSkill;
+    const sector = req.body?.sector;
+    if (!skill || typeof skill !== 'string' || !skill.trim()) {
+      res.status(400).json({ error: 'Field "skill" is required in request body.' });
+      return;
+    }
+
+    const matchResult = await matchSkill(skill.trim(), { sector });
+    res.json(matchResult);
+  } catch (err: any) {
+    console.error('Error matching skill against NCO-2015:', err);
+    res.status(500).json({
+      error: err?.message || 'Failed to match skill against NCO-2015 catalogue'
+    });
   }
 });
 

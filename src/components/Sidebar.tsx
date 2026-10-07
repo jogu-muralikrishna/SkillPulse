@@ -10,6 +10,7 @@ import {
   ListOrdered,
   MapPin,
   Bot,
+  GitFork,
   X
 } from 'lucide-react';
 
@@ -235,6 +236,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Reference & Methodology */}
           <div className="pt-2 border-t border-slate-800 space-y-1">
+            <button
+              onClick={() => {
+                onNavigate('normalization');
+                onCloseMobile();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-lg transition-colors text-left cursor-pointer ${
+                currentView === 'normalization'
+                  ? 'bg-indigo-600 text-white shadow-xs font-semibold'
+                  : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
+              }`}
+            >
+              <GitFork className={`w-4 h-4 shrink-0 ${currentView === 'normalization' ? 'text-white' : 'text-slate-400'}`} />
+              <span>Skill Normalization</span>
+            </button>
+
             <button
               onClick={() => {
                 onNavigate('methodology');

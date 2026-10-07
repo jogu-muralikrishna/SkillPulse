@@ -13,6 +13,7 @@ import { LocationView } from './views/LocationView';
 import { AssistantView } from './views/AssistantView';
 import { MethodologyView } from './views/MethodologyView';
 import { DataSourcesView } from './views/DataSourcesView';
+import { NormalizationView } from './views/NormalizationView';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<string>('dashboard');
@@ -72,6 +73,9 @@ export default function App() {
         return <MethodologyView />;
       case 'data-sources':
         return <DataSourcesView />;
+      case 'normalization':
+      case 'skills-normalization':
+        return <NormalizationView />;
       default:
         return <DashboardView onNavigate={handleNavigate} />;
     }

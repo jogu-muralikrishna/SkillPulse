@@ -13,7 +13,9 @@
     "refresh": "tsx scripts/refresh.ts",
     "nco:import": "tsx scripts/importNco2015.ts",
     "nco:embed": "tsx scripts/generateNcoEmbeddings.ts",
-    "test:embed": "tsx scripts/testEmbeddingProbe.ts"
+    "test:embed": "tsx scripts/testEmbeddingProbe.ts",
+    "test:match": "tsx scripts/testMatchProbe.ts",
+    "skills:embed": "tsx scripts/generateSkillEmbeddings.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
