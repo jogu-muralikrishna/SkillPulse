@@ -53,6 +53,7 @@ export interface AssistantChatResult {
     source: string;
   }>;
   sources: AssistantSourceCitation[];
+  isFallback?: boolean;
 }
 
 const SYSTEM_INSTRUCTION = `You are SkillPulse Assistant, an expert labor market intelligence analyst for the SkillPulse platform.
@@ -222,7 +223,8 @@ async function executeDeterministicFallback(
       endpoint: t.endpoint,
       source: t.source
     })),
-    sources: Array.from(sourcesMap.entries()).map(([endpoint, source]) => ({ endpoint, source }))
+    sources: Array.from(sourcesMap.entries()).map(([endpoint, source]) => ({ endpoint, source })),
+    isFallback: true
   };
 }
 
@@ -385,6 +387,7 @@ export async function processAssistantChat(
       endpoint: t.endpoint,
       source: t.source
     })),
-    sources: Array.from(sourcesMap.entries()).map(([endpoint, source]) => ({ endpoint, source }))
+    sources: Array.from(sourcesMap.entries()).map(([endpoint, source]) => ({ endpoint, source })),
+    isFallback: false
   };
 }
