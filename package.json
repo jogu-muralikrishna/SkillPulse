@@ -11,7 +11,9 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "refresh": "tsx scripts/refresh.ts",
-    "nco:import": "tsx scripts/importNco2015.ts"
+    "nco:import": "tsx scripts/importNco2015.ts",
+    "nco:embed": "tsx scripts/generateNcoEmbeddings.ts",
+    "test:embed": "tsx scripts/testEmbeddingProbe.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
