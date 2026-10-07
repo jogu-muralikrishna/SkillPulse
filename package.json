@@ -19,6 +19,7 @@
     "test:assistant": "tsx scripts/testAssistantTools.ts",
     "test:assistant:ui": "tsx scripts/testAssistantUiContract.ts",
     "test:reskill": "tsx scripts/testReskilling.ts",
+    "test:anomalies": "tsx scripts/testAnomalyDetection.ts",
     "skills:embed": "tsx scripts/generateSkillEmbeddings.ts"
   },
   "dependencies": {

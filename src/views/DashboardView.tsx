@@ -14,9 +14,15 @@ import {
   ChevronRight,
   Bot,
   Filter,
-  RotateCcw
+  RotateCcw,
+  Activity,
+  ArrowUpRight,
+  ArrowDownRight,
+  CheckCircle2,
+  Info
 } from 'lucide-react';
 import { TelanganaCoverageWarning } from '../components/TelanganaCoverageWarning';
+import { AnomalyDetectionResponse } from '../utils/anomalyDetection';
 import {
   ResponsiveContainer,
   XAxis,
@@ -35,6 +41,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   const [data, setData] = useState<any>(null);
   const [demandData, setDemandData] = useState<any>(null);
   const [gapData, setGapData] = useState<any>(null);
+  const [anomalyData, setAnomalyData] = useState<AnomalyDetectionResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Dynamic Geography and Sector Filters
@@ -53,21 +60,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
 
         const qs = params.toString() ? `?${params.toString()}` : '';
 
-        const [overviewRes, demandRes, gapRes] = await Promise.all([
+        const [overviewRes, demandRes, gapRes, anomalyRes] = await Promise.all([
           fetch(`/api/overview${qs}`),
           fetch(`/api/demand${qs}`),
           fetch(`/api/gaps${qs}`),
+          fetch(`/api/anomalies${qs}`)
         ]);
 
-        const [overviewJson, demandJson, gapJson] = await Promise.all([
+        const [overviewJson, demandJson, gapJson, anomalyJson] = await Promise.all([
           overviewRes.json(),
           demandRes.json(),
           gapRes.json(),
+          anomalyRes.json()
         ]);
 
         setData(overviewJson);
         setDemandData(demandJson);
         setGapData(gapJson);
+        setAnomalyData(anomalyJson);
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       } finally {
@@ -467,6 +477,115 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                   Check Demand Forecast →
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Data Quality & Statistical Anomaly Monitoring Section */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-indigo-600" />
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span>Data Quality & QoQ Anomaly Monitoring</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      3-Sigma Rule
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Quarter-on-Quarter (QoQ) demand variance monitoring across verified time-series filings
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="text-xs text-slate-500">Total Anomalies:</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono ${
+                  (anomalyData?.totalAnomalies || 0) > 0
+                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}>
+                  {anomalyData?.totalAnomalies || 0}
+                </span>
+              </div>
+            </div>
+
+            {anomalyData && anomalyData.anomalies && anomalyData.anomalies.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {anomalyData.anomalies.map((a, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-xl border space-y-2.5 ${
+                        a.direction === 'spike'
+                          ? 'bg-amber-50/60 border-amber-200 text-amber-900'
+                          : 'bg-rose-50/60 border-rose-200 text-rose-900'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                          a.direction === 'spike'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                            : 'bg-rose-100 text-rose-800 border border-rose-300'
+                        }`}>
+                          {a.direction === 'spike' ? (
+                            <ArrowUpRight className="w-3 h-3" />
+                          ) : (
+                            <ArrowDownRight className="w-3 h-3" />
+                          )}
+                          {a.direction.toUpperCase()} ({a.severity})
+                        </span>
+                        <span className="font-mono text-xs font-bold text-slate-700">
+                          z = {a.zScore > 0 ? `+${a.zScore}` : a.zScore}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 leading-snug">{a.skill}</h4>
+                        <p className="text-[11px] text-slate-600">{a.district}, {a.state} • {a.period}</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 text-[11px] grid grid-cols-2 gap-1 font-mono text-slate-700">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block font-sans">QoQ Change:</span>
+                          <span className="font-bold">{a.qoqChange > 0 ? `+${a.qoqChange}` : a.qoqChange}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block font-sans">Baseline Mean:</span>
+                          <span>{a.meanQoqChange > 0 ? `+${a.meanQoqChange}` : a.meanQoqChange} (±{a.stdQoqChange})</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Clear Empty State */
+              <div className="p-6 bg-slate-50 border border-slate-200/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">
+                      No statistically significant QoQ anomalies detected in the available historical data.
+                    </h4>
+                    <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                      All evaluated quarterly delta series ({anomalyData?.seriesAnalyzed || 0} series) lie within ±3 standard deviations of their empirical historical mean.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shrink-0 self-start sm:self-auto">
+                  Method: |Δt - μ| &le; 3σ (QoQ)
+                </div>
+              </div>
+            )}
+
+            {/* Completeness / Scope Disclaimer */}
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/70 text-[11px] text-slate-500 leading-relaxed flex items-start gap-2">
+              <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+              <span>
+                <strong>Statistical Scope & Provenance:</strong> Anomaly detection is performed strictly on comparable historical series within the available SkillPulse dataset (minimum {anomalyData?.provenance?.minimumQoqObservations || 4} QoQ observations). This serves as an analytical data-quality indicator and does not represent a claim of exhaustive national statistical completeness.
+              </span>
             </div>
           </div>
 

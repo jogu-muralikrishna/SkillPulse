@@ -36,6 +36,7 @@ import {
   MATCH_ACCEPTANCE_THRESHOLD
 } from '../utils/ncoMatchingService';
 import { getReskillingRecommendations } from '../utils/reskillingService';
+import { detectQoqAnomalies } from '../utils/anomalyDetection';
 import { formatPeriodToHuman } from '../utils/dateFormatter';
 import { SkillMapping, QualityLevel } from '../types';
 
@@ -551,6 +552,20 @@ router.get('/reskill', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: err?.message || 'Failed to calculate reskilling recommendations'
+    });
+  }
+});
+
+// 6d. Quarter-on-Quarter (QoQ) Anomaly Detection
+router.get('/anomalies', (req: Request, res: Response) => {
+  try {
+    const { state, district, skill } = req.query as Record<string, string>;
+    const result = detectQoqAnomalies({ state, district, skill });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Failed to detect anomalies'
     });
   }
 });
