@@ -16,6 +16,7 @@
     "test:embed": "tsx scripts/testEmbeddingProbe.ts",
     "test:match": "tsx scripts/testMatchProbe.ts",
     "test:forecast": "tsx scripts/testMlForecastIntegration.ts",
+    "test:assistant": "tsx scripts/testAssistantTools.ts",
     "skills:embed": "tsx scripts/generateSkillEmbeddings.ts"
   },
   "dependencies": {

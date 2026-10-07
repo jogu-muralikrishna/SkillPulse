@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import { processAssistantChat } from './assistantService';
 import { DATA_SOURCES } from '../data/dataSources';
 import { LOCATIONS } from '../data/locations';
 import { MASTER_STATES, MASTER_DISTRICTS, getDistrictsForState } from '../data/masterGeography';
@@ -813,7 +814,7 @@ router.post('/skills/mappings', (req: Request, res: Response) => {
   }
 });
 
-// 12. Grounded AI Assistant (SkillPulse Assistant)
+// 12. Grounded AI Assistant (SkillPulse Assistant — Phase 4A Gemini Function Calling)
 router.post('/assistant/chat', async (req: Request, res: Response) => {
   try {
     const { message, state, district, skill, sector, period } = req.body || {};
@@ -822,257 +823,23 @@ router.post('/assistant/chat', async (req: Request, res: Response) => {
       return;
     }
 
-    const lowerMsg = message.toLowerCase();
-
-    // Resolve target location from body parameters or query text
-    let targetState = state ? resolveCanonicalState(state) : null;
-    let targetDistrict = district ? resolveCanonicalDistrict(district, targetState?.state_name) : null;
-
-    if (!targetDistrict && !targetState) {
-      const sortedStates = [...MASTER_STATES].sort((a, b) => b.state_name.length - a.state_name.length);
-      for (const s of sortedStates) {
-        const pattern = new RegExp(`\\b${s.state_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-        if (pattern.test(message)) {
-          targetState = s;
-          break;
-        }
-      }
-
-      const sortedDistricts = [...MASTER_DISTRICTS].sort((a, b) => b.district_name.length - a.district_name.length);
-      for (const d of sortedDistricts) {
-        const pattern = new RegExp(`\\b${d.district_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-        if (pattern.test(message)) {
-          targetDistrict = d;
-          if (!targetState) {
-            targetState = resolveCanonicalState(d.state_id);
-          }
-          break;
-        }
-      }
-    }
-
-    const geoQuery = {
-      state: targetState ? targetState.state_name : (state || undefined),
-      district: targetDistrict ? targetDistrict.district_name : (district || undefined),
-      sector: sector || undefined,
-      skill: skill || undefined,
-      period: period || undefined
-    };
-
-    const hasSpecificLocation = Boolean(targetDistrict || targetState);
-    const locationLabel = targetDistrict
-      ? `${targetDistrict.district_name} (${targetState?.state_name || ''})`
-      : targetState
-      ? targetState.state_name
-      : '';
-
-    const locDemand = filterByCanonicalGeography(DEMAND_RECORDS, geoQuery);
-    const locSupply = filterByCanonicalGeography(SUPPLY_WORKER_RECORDS, geoQuery);
-    const locTraining = filterByCanonicalGeography(TRAINING_RECORDS, geoQuery);
-    const locGaps = calculateSkillGaps(geoQuery);
-
-    const allGaps = calculateSkillGaps();
-    const shortages = allGaps.filter(g => g.isComparable && g.classification === 'SHORTAGE');
-    const oversupply = allGaps.filter(g => g.isComparable && g.classification === 'OVERSUPPLY');
-    const topDemand = [...DEMAND_RECORDS]
-      .filter(d => d.period === '2024-Q4' || d.period === '2025-Q1')
-      .sort((a, b) => b.demandCount - a.demandCount)
-      .slice(0, 15);
-
-    const contextData = {
-      activeQueryLocation: hasSpecificLocation ? locationLabel : 'National (All Covered States)',
-      activeLocationDemandRecords: locDemand.length,
-      activeLocationSupplyRecords: locSupply.length,
-      activeLocationTrainingRecords: locTraining.length,
-      activeLocationShortages: locGaps.filter(g => g.isComparable && g.classification === 'SHORTAGE').length,
-      availableStates: Array.from(new Set(DEMAND_RECORDS.map(d => d.state))),
-      availableDistricts: Array.from(new Set(DEMAND_RECORDS.map(d => `${d.district} (${d.state})`))),
-      sectors: SECTORS.map(s => s.name),
-      topDemandRecordsLatest: topDemand.map(d => ({
-        skill: d.normalizedSkill,
-        district: d.district,
-        state: d.state,
-        quarter: d.period,
-        demand: d.demandCount,
-        sector: d.sector
-      })),
-      potentialShortages: shortages.map(s => ({
-        skill: s.normalizedSkill,
-        district: s.district,
-        state: s.state,
-        demand: s.demand,
-        effectiveSupply: s.effectiveSupply,
-        potentialGap: s.gap,
-        gapPercent: s.gapPercentage
-      })),
-      potentialOversupply: oversupply.map(s => ({
-        skill: s.normalizedSkill,
-        district: s.district,
-        state: s.state,
-        demand: s.demand,
-        effectiveSupply: s.effectiveSupply,
-        surplus: s.gap !== null ? -s.gap : 0
-      })),
-      dataSourcesUsed: DATA_SOURCES.map(d => `${d.name} (${d.organization}) - URL: ${d.url}`)
-    };
-
-    const systemPrompt = `You are SkillPulse Assistant, an expert labor market intelligence analyst for the SkillPulse platform.
-Your mandate is to provide factual, transparent, and grounded insights on skill demand, worker supply, skill shortages, training capacity, methodology, data sources, reliability, and ethical principles in India.
-
-CRITICAL INSTRUCTIONS:
-1. STRICT DATA GROUNDING: You MUST answer strictly using the verified facts, methodology, and database state below.
-2. ABSOLUTELY NO FAKE DATA: NEVER invent or hallucinate statistics, job counts, district figures, dates, sources, or percentages.
-3. DATA UNAVAILABILITY RULE: If a user asks about a location (e.g., Arunachal Pradesh, Warangal, or any unfiled district) that does not have verified records in the database, explicitly state:
-   "No verified labour-market filings (demand, workforce, or training output) are currently recorded in official government registries for this selection. In accordance with SkillPulse methodology, missing records are never converted to zero or simulated with synthetic figures."
-   NEVER borrow or default to Hyderabad or Telangana data when answering for another location!
-4. WHERE DID THIS DATA COME FROM: Explain the four official sources:
-   - Local Government Directory (LGD) — Ministry of Panchayati Raj (Administrative master of all 36 States/UTs and 786 Districts).
-   - National Career Service (NCS) — Ministry of Labour & Employment (Job vacancies & employer hiring demand).
-   - e-Shram National Database — Ministry of Labour & Employment (Registered workers & jobseekers).
-   - Ministry of Skill Development & Entrepreneurship (MSDE) / PMKVY — (Accredited training centers, enrolled trainees, certified candidates, and placement outcomes).
-5. HOW SKILL GAPS ARE CALCULATED:
-   - Demand = Active verified job vacancies in the location for the normalized skill.
-   - Available Workforce = Registered Seekers (e-Shram/NCS) + (Certified Placed Candidates × 0.70 retention factor).
-   - Potential Skill Gap = Demand - Available Workforce.
-   - Status: Potential Shortage (> +15% deficit), Balanced (±15%), Potential Oversupply (< -15% surplus).
-   - Non-comparable rule: Gaps are only calculated when demand and supply exist on identical spatial and temporal boundaries. If data is missing on either side, report: "Gap cannot be calculated because comparable data is unavailable." Missing data is never treated as zero.
-6. IS THIS DATA RELIABLE & FRESH:
-   - Records are updated through September 2026 from verified government filings.
-   - Decoupled geography allows all 786 districts in India to exist; if no filing is reported, the district is marked as "Data unavailable" rather than false zero.
-7. TONE: Maintain an authoritative, official labor-market intelligence tone suitable for state planners, employers, and vocational councils.
-
-DATABASE GROUND TRUTH CONTEXT:
-${JSON.stringify(contextData, null, 2)}
-`;
-
-    if (!geminiAi) {
-      let reply = '';
-
-      const isSourceQuery =
-        lowerMsg.includes('source') ||
-        lowerMsg.includes('dataset') ||
-        lowerMsg.includes('provenance') ||
-        lowerMsg.includes('data origin') ||
-        (lowerMsg.includes('where') && (lowerMsg.includes('data') || lowerMsg.includes('come from')));
-
-      const isWorkforceUnavailableQuery =
-        (lowerMsg.includes('workforce') || lowerMsg.includes('supply') || lowerMsg.includes('jobseeker') || lowerMsg.includes('worker')) &&
-        (lowerMsg.includes('unavail') || lowerMsg.includes('miss') || lowerMsg.includes('not available') || lowerMsg.includes('why') || lowerMsg.includes('empty') || lowerMsg.includes('zero') || lowerMsg.includes('lack') || lowerMsg.includes('have'));
-
-      const isUnavailableQuery =
-        lowerMsg.includes('why') && (lowerMsg.includes('unavailable') || lowerMsg.includes('missing') || lowerMsg.includes('not available') || lowerMsg.includes('no data'));
-
-      const isForecastQuery =
-        lowerMsg.includes('forecast') || lowerMsg.includes('projection') || lowerMsg.includes('future demand') || lowerMsg.includes('predict');
-
-      const isSkillGapQuery =
-        lowerMsg.includes('gap') ||
-        (lowerMsg.includes('skill') && (lowerMsg.includes('calculated') || lowerMsg.includes('calculation') || lowerMsg.includes('formula') || lowerMsg.includes('method')));
-
-      if (isSourceQuery) {
-        reply = `SkillPulse relies strictly on verified public government datasets:
-
-1. Local Government Directory (LGD) — Ministry of Panchayati Raj: The official administrative geography master containing all 36 States/Union Territories and 786 Districts across India.
-2. National Career Service (NCS) — Ministry of Labour & Employment: Monthly employer vacancy filings and hiring demand signals.
-3. e-Shram National Database — Ministry of Labour & Employment: Registered worker counts and technical jobseeker profiles across formal and unorganized sectors.
-4. Ministry of Skill Development & Entrepreneurship (MSDE) / PMKVY: Accredited training center capacity, enrolled students, certified candidates, and placement outcomes.
-
-We do not use unverified web scrapes or synthetic estimates.`;
-      } else if (isWorkforceUnavailableQuery || isUnavailableQuery) {
-        reply = `Workforce (supply) data is reported as "Unavailable" rather than zero because empirical candidate and worker registries are currently pending validated ingestion from primary official sources (e-Shram and PLFS).
-
-Key principles enforced:
-1. Missing Data ≠ Zero: We never report 0 simply because records are unfiled or pending validation. Displaying 0 would falsely indicate zero available workers, which would distort planning.
-2. Incompatible Populations: Unorganised worker registrations (e-Shram) cannot be directly subtracted from formal sector employer vacancies (NCS).
-3. Comparability Requirement: Skill gaps are only calculated when verified demand and supply records exist on identical spatial and temporal boundaries.`;
-      } else if (isForecastQuery) {
-        reply = `SkillPulse uses an Ordinary Least Squares (OLS) linear trend model for demand forecasting under strict data integrity constraints:
-
-1. Minimum Historical Threshold: At least 3 consecutive historical quarters of verified demand in the specific geography are required. If fewer exist, projections are withheld to avoid synthetic guesses.
-2. Clear Separation: Projections (forward quarters such as 2025/2026) are explicitly tagged as forecasts and never presented as observed historical filings.
-3. No Geographic Fallback: Forecasts are calculated strictly on the selected district's observed data; they never silently borrow trendlines from other districts (e.g. Hyderabad).
-4. What-If Testing: Planners can test hypothetical growth scenarios (+5% to +50%) in the What-If Simulator without altering baseline empirical records.`;
-      } else if (isSkillGapQuery) {
-        reply = `Skill gaps in SkillPulse are calculated using an empirical comparison on identical spatial and temporal boundaries:
-
-• Demand: The number of active verified job vacancies posted by employers for a normalized skill in that specific district and time period.
-• Available Workforce: Active registered jobseekers (from e-Shram/NCS) plus institutional training output (certified placed graduates weighted by a 0.70 retention factor).
-• Potential Skill Gap = Demand − Available Workforce.
-
-Classification:
-- Potential Shortage: Demand exceeds available workforce by more than 15%.
-- Balanced: Demand and available workforce are aligned within ±15%.
-- Potential Oversupply: Available workforce exceeds demand by more than 15%.
-
-Important: If demand or supply data is unfiled for a district, SkillPulse displays: "Gap cannot be calculated because comparable data is unavailable." Missing data is never treated as zero.`;
-      } else if (lowerMsg.includes('reliable') || lowerMsg.includes('fresh') || lowerMsg.includes('limitation') || lowerMsg.includes('quality')) {
-        reply = `Data reliability and freshness in SkillPulse:
-
-• Current Year: 2026. The connected government datasets include filings updated through September 2026.
-• Data Reliability: High for covered industrial districts where regular employer filings and worker registrations are submitted.
-• Decoupled Geography: All 786 official districts in India exist in the master database. Districts without active filings clearly show "Data unavailable" rather than false zero values.
-• Key Limitations: SkillPulse only reflects official government filings (NCS, e-Shram, MSDE). Informal job exchanges and unfiled private job postings outside formal registries are not captured. Projections require at least 4 consecutive historical quarters to be generated.`;
-      } else if (lowerMsg.includes('methodology') || lowerMsg.includes('how it works') || lowerMsg.includes('how skillpulse works')) {
-        reply = `SkillPulse follows a 7-step analytical framework:
-
-1. Collect: Ingest verified filings from official government portals (LGD, NCS, e-Shram, MSDE).
-2. Clean: Deduplicate records, format dates, and validate administrative boundaries.
-3. Standardize: Group variations of job titles into standardized skill definitions.
-4. Align: Compare employer demand and worker supply on strictly identical geographic and temporal boundaries.
-5. Identify Gaps: Highlight potential shortages (> +15% deficit) or surpluses (> +15% oversupply).
-6. Forecast: Where at least 4 consecutive historical periods exist, estimate future demand trends.
-7. Planning Insights: Guide training capacity allocation and vocational course seats for education providers.`;
-      } else if (lowerMsg.includes('ethical') || lowerMsg.includes('ethics') || lowerMsg.includes('responsible')) {
-        reply = `Ethical principles and responsible use in SkillPulse:
-
-1. Decision Support, Not Quotas: SkillPulse provides descriptive intelligence to assist planners. It never issues automated employment quotas or forced vocational mandates.
-2. Honest Absence of Data: Missing data is never converted to zero. Unfiled districts are transparently reported as "Data unavailable" to prevent flawed funding decisions.
-3. Policy Phrasing: Skilling guidance strictly adheres to: "Based on available data, additional training capacity MAY be considered."
-4. Fairness & Transparency: All calculations are derived from verified empirical filings without hidden black-box adjustments or demographic filtering.`;
-      } else if (lowerMsg.includes('normalization') || lowerMsg.includes('standardization')) {
-        reply = `Skill normalization is the process of mapping thousands of unstructured, differently phrased job titles into consistent, standard skill definitions aligned with Sector Skill Councils (SSCs). For example, "Python Developer", "Python Software Engineer", and "Backend Python Coder" are all standardized to "Python Development". This ensures that job vacancies and worker registrations can be accurately compared.`;
-      } else if (hasSpecificLocation) {
-        if (locDemand.length === 0 && locSupply.length === 0 && locTraining.length === 0) {
-          reply = `No verified labour-market filings (demand, workforce, or training output) are currently recorded in official government registries for **${locationLabel}**.\n\nWhile the official Local Government Directory (LGD) administrative record is fully recognized, no quarterly employer job postings or worker registrations have been filed for this region in the current connected datasets.\n\nIn accordance with SkillPulse methodology, missing data is transparently reported as unavailable rather than displaying false zero values or synthetic figures.`;
-        } else {
-          const topLocDemands = [...locDemand].slice(0, 5);
-          const locShortages = locGaps.filter(g => g.isComparable && g.classification === 'SHORTAGE');
-          const totalLocDemand = locDemand.reduce((s, d) => s + d.demandCount, 0);
-
-          reply = `Based on verified filings for **${locationLabel}**:\n\n` +
-            `• **Total Verified Demand**: ${totalLocDemand.toLocaleString()} openings across ${new Set(locDemand.map(d => d.normalizedSkill)).size} skills.\n` +
-            (locShortages.length > 0
-              ? `• **Identified Shortages**: ${locShortages.map(s => `${s.normalizedSkill} (gap: +${s.gap})`).join(', ')}.\n`
-              : `• **Skill Gap Analysis**: Microdata alignment indicates gaps are non-comparable where corresponding worker registries are unfiled.\n`) +
-            `\nTop verified skills in this geography:\n` +
-            topLocDemands.map(d => `- **${d.normalizedSkill}** (${d.sector}): ${d.demandCount.toLocaleString()} postings (${d.period})`).join('\n') +
-            `\n\nAll metrics are derived strictly from official NCS, e-Shram, and MSDE filings.`;
-        }
-      } else {
-        const totalDemand = DEMAND_RECORDS.reduce((sum, d) => sum + d.demandCount, 0);
-        reply = `SkillPulse currently tracks verified quarterly demand records across ${contextData.availableDistricts.length} industrial districts and ${contextData.sectors.length} sectors with a total aggregated demand of ${totalDemand.toLocaleString()} openings.\n\nYou can ask me about data sources, how skill gaps are calculated, data reliability, forecasting methodology, ethical limitations, or specific location insights (e.g. Pune, Bengaluru Urban, Chennai, Hyderabad, or Arunachal Pradesh)!`;
-      }
-
-      res.json({ reply, source: 'SkillPulse Grounded Engine' });
-      return;
-    }
-
-    const aiResponse = await geminiAi.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: message,
-      config: {
-        systemInstruction: systemPrompt,
-        temperature: 0.2,
-      },
+    const result = await processAssistantChat({
+      message,
+      state,
+      district,
+      skill,
+      sector,
+      period
     });
 
-    const replyText = aiResponse.text || "I don't have enough verified data to answer that.";
-    res.json({ reply: replyText, source: 'SkillPulse Assistant (Gemini 3.8 Flash)' });
+    res.json(result);
   } catch (error: any) {
-    console.error('Error generating AI response:', error);
-    res.json({
-      reply: "Based on the application's verified database: The loaded data covers industrial districts across covered sectors. (Notice: External AI model service encountered a temporary network constraint).",
-      source: 'SkillPulse Local Engine'
+    console.error('Error in assistant chat endpoint:', error);
+    res.status(500).json({
+      answer: "data not available due to a server constraint. Please refer to verified dashboard tables.",
+      reply: "data not available due to a server constraint. Please refer to verified dashboard tables.",
+      toolCalls: [],
+      sources: []
     });
   }
 });
