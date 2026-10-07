@@ -35,6 +35,7 @@ import {
   findBestNcoMatch,
   MATCH_ACCEPTANCE_THRESHOLD
 } from '../utils/ncoMatchingService';
+import { getReskillingRecommendations } from '../utils/reskillingService';
 import { formatPeriodToHuman } from '../utils/dateFormatter';
 import { SkillMapping, QualityLevel } from '../types';
 
@@ -529,6 +530,28 @@ router.get('/planning-data', (req: Request, res: Response) => {
     res.json(planning);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to fetch planning data' });
+  }
+});
+
+// 6c. Embedding-Based Reskilling Recommendations
+router.get('/reskill', async (req: Request, res: Response) => {
+  try {
+    const { state, district, skill } = req.query as Record<string, string>;
+
+    if (!skill || !state || !district) {
+      res.status(400).json({
+        error: 'state, district, and skill query parameters are required for reskilling recommendations.'
+      });
+      return;
+    }
+
+    const recommendations = await getReskillingRecommendations(state, district, skill);
+    res.json(recommendations);
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Failed to calculate reskilling recommendations'
+    });
   }
 });
 

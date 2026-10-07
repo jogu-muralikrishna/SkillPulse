@@ -20,9 +20,11 @@ import {
   Info,
   Minus,
   HelpCircle,
-  Sparkles
+  Sparkles,
+  Compass
 } from 'lucide-react';
 import { PlanningDataResult } from '../types';
+import { ReskillingResponse } from '../utils/reskillingService';
 
 interface TrainingPlannerViewProps {
   onNavigateToSimulator?: (skill: string, state: string, district: string) => void;
@@ -39,6 +41,8 @@ export const TrainingPlannerView: React.FC<TrainingPlannerViewProps> = ({
 
   const [planningData, setPlanningData] = useState<PlanningDataResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reskillingData, setReskillingData] = useState<ReskillingResponse | null>(null);
+  const [loadingReskill, setLoadingReskill] = useState(false);
 
   // Dynamically extract verified skills for the selected state and district from real records
   const availableSkills = useMemo(() => {
@@ -92,14 +96,14 @@ export const TrainingPlannerView: React.FC<TrainingPlannerViewProps> = ({
         return;
       }
 
+      const params = new URLSearchParams({
+        skill: selectedSkill,
+        state: selectedState,
+        district: selectedDistrict,
+      });
+
       try {
         setLoading(true);
-        const params = new URLSearchParams({
-          skill: selectedSkill,
-          state: selectedState,
-          district: selectedDistrict,
-        });
-
         const res = await fetch(`/api/planning-data?${params.toString()}`);
         if (res.ok) {
           const json: PlanningDataResult = await res.json();
@@ -115,6 +119,23 @@ export const TrainingPlannerView: React.FC<TrainingPlannerViewProps> = ({
         setPlanningData(fallback);
       } finally {
         setLoading(false);
+      }
+
+      // Fetch embedding-based reskilling recommendations
+      try {
+        setLoadingReskill(true);
+        const reskillRes = await fetch(`/api/reskill?${params.toString()}`);
+        if (reskillRes.ok) {
+          const reskillJson: ReskillingResponse = await reskillRes.json();
+          setReskillingData(reskillJson);
+        } else {
+          setReskillingData(null);
+        }
+      } catch (err) {
+        console.error('Failed to load reskilling recommendations:', err);
+        setReskillingData(null);
+      } finally {
+        setLoadingReskill(false);
       }
     }
 
@@ -443,6 +464,112 @@ export const TrainingPlannerView: React.FC<TrainingPlannerViewProps> = ({
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Reskilling Pathways Card (Section 15) */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 sm:p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Reskilling Pathways (Embedding-Based Recommendations)
+                </h3>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Gemini Semantic Embedding (768-dim)
+              </span>
+            </div>
+
+            {loadingReskill ? (
+              <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-500 flex items-center gap-2.5">
+                <div className="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></div>
+                <span>Evaluating local labor shortages & semantic embedding proximity...</span>
+              </div>
+            ) : reskillingData && reskillingData.eligibleForReskilling && reskillingData.paths.length > 0 ? (
+              <div className="space-y-4">
+                {/* Source Oversupply Notice */}
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <div>
+                      <span className="font-semibold text-amber-900">
+                        Workforce Surplus Identified: {reskillingData.oversuppliedSkill?.skill}
+                      </span>
+                      <p className="text-[11px] text-amber-700 mt-0.5">
+                        Supply ({reskillingData.oversuppliedSkill?.supply?.toLocaleString()}) exceeds observed demand ({reskillingData.oversuppliedSkill?.demand?.toLocaleString()}) by {Math.abs(reskillingData.oversuppliedSkill?.gapPercentage ?? 0)}%.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-amber-800 text-xs font-semibold bg-amber-100/80 px-2.5 py-1 rounded-md self-start sm:self-auto shrink-0">
+                    Surplus: {reskillingData.oversuppliedSkill?.gap}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  The SkillPulse Reskilling Engine evaluated candidate occupations in <strong>{selectedDistrict}</strong> and identified the closest semantic alternatives currently experiencing an active hiring shortage:
+                </p>
+
+                {/* Top 3 Paths */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {reskillingData.paths.map((path, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl space-y-3 transition-colors flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-2">
+                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Rank #{idx + 1}
+                          </span>
+                          <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                            {(path.similarity * 100).toFixed(1)}% similarity
+                          </span>
+                        </div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                          {path.skill}
+                        </h4>
+                        <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
+                          {path.reason}
+                        </p>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-slate-200 text-[10px] space-y-1 bg-white/70 p-2.5 rounded-lg border border-slate-100">
+                        <div className="flex justify-between items-center text-slate-700 font-medium">
+                          <span>District Shortage:</span>
+                          <span className="font-mono text-rose-600 font-bold text-[11px]">+{path.districtGap.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-500">
+                          <span>Demand / Supply:</span>
+                          <span className="font-mono">{path.demand.toLocaleString()} / {path.supply.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Provenance Footnote */}
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/70 text-[11px] text-slate-500 leading-relaxed">
+                  <strong>Provenance & Governance:</strong> Recommendations are calculated from SkillPulse demand/supply data and Gemini 768-dimensional semantic embedding cosine similarity. These analytical transitions provide decision-support and do not constitute official government recommendations or employment mandates.
+                </div>
+              </div>
+            ) : (
+              /* Appropriate Empty State */
+              <div className="p-5 bg-slate-50 border border-slate-200/80 rounded-xl text-center space-y-2">
+                <div className="w-8 h-8 rounded-full bg-slate-200/70 text-slate-500 flex items-center justify-center mx-auto">
+                  <Compass className="w-4 h-4" />
+                </div>
+                <h4 className="text-xs font-bold text-slate-800">
+                  No Reskilling Pathway Required
+                </h4>
+                <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
+                  {reskillingData?.message ||
+                    'This skill is not currently classified as OVERSUPPLY in this district. Reskilling recommendations are specifically targeted to support workers in oversupplied occupations transitioning to adjacent shortage skills.'}
+                </p>
+                <div className="text-[10px] text-slate-400 pt-1">
+                  Source: SkillPulse Reskilling Engine · Verified Supply/Demand Data
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

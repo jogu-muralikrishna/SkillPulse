@@ -156,7 +156,7 @@ export function calculateSkillGaps(filters?: {
     let classification: 'SHORTAGE' | 'BALANCED' | 'OVERSUPPLY' = 'BALANCED';
     if (gapPercentage > thresholds.shortageThresholdPercent) {
       classification = 'SHORTAGE';
-    } else if (gapPercentage < thresholds.oversupplyThresholdPercent) {
+    } else if (gapPercentage <= thresholds.oversupplyThresholdPercent) {
       classification = 'OVERSUPPLY';
     }
 
