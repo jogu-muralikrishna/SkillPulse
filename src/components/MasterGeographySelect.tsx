@@ -111,7 +111,7 @@ export const MasterGeographySelect: React.FC<MasterGeographySelectProps> = ({
                 </span>
               ) : (
                 <span className="text-slate-600 font-normal">
-                  {showAllOption ? 'All States & Union Territories' : 'Select State / UT'}
+                  {showAllOption ? 'All India' : 'Select State / UT'}
                 </span>
               )}
             </span>
@@ -158,7 +158,7 @@ export const MasterGeographySelect: React.FC<MasterGeographySelectProps> = ({
                       !selectedState ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700'
                     }`}
                   >
-                    <span>All States & Union Territories</span>
+                    <span>All India</span>
                     {!selectedState && <Check className="w-3.5 h-3.5 text-indigo-600" />}
                   </button>
                 )}

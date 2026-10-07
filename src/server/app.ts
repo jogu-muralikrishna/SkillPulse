@@ -33,7 +33,8 @@ import {
   loadNcoIndex,
   loadSkillEmbeddingsCache,
   findBestNcoMatch,
-  MATCH_ACCEPTANCE_THRESHOLD
+  MATCH_ACCEPTANCE_THRESHOLD,
+  classifyMatchStatus
 } from '../utils/ncoMatchingService';
 import { getReskillingRecommendations } from '../utils/reskillingService';
 import { detectQoqAnomalies } from '../utils/anomalyDetection';
@@ -784,7 +785,7 @@ function enrichMappingsWithNco(mappings: SkillMapping[]): SkillMapping[] {
           semanticConfidence: match.semanticConfidence,
           domainCompatibility: match.domainCompatibility,
           explanation: match.explanation,
-          matchStatus: match.confidence >= MATCH_ACCEPTANCE_THRESHOLD ? 'accepted' : 'needs_review',
+          matchStatus: classifyMatchStatus(match.confidence),
           embeddingProvider: 'gemini',
           embeddingModel: 'gemini-embedding-2',
           sourceUrl: match.occupation.sourceUrl

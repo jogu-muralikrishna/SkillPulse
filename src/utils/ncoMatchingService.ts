@@ -28,7 +28,8 @@ import {
   computeTextHash
 } from './embeddingService';
 
-export const MATCH_ACCEPTANCE_THRESHOLD = 0.75;
+import { MATCH_ACCEPTANCE_THRESHOLD, classifyMatchStatus } from '../types';
+export { MATCH_ACCEPTANCE_THRESHOLD, classifyMatchStatus };
 export const EMBEDDING_PROVIDER = 'gemini';
 
 export interface NcoOccupationRecord {
@@ -619,8 +620,7 @@ export async function matchSkill(
     topK: options?.topK
   });
 
-  const matchStatus: 'accepted' | 'needs_review' =
-    match.confidence >= MATCH_ACCEPTANCE_THRESHOLD ? 'accepted' : 'needs_review';
+  const matchStatus: 'accepted' | 'needs_review' = classifyMatchStatus(match.confidence);
 
   return {
     rawSkill: cleanSkill,
@@ -722,7 +722,7 @@ export async function matchSkillsBatch(
       domainCompatibility: match.domainCompatibility,
       explanation: match.explanation,
       sector: skillSector,
-      matchStatus: match.confidence >= MATCH_ACCEPTANCE_THRESHOLD ? 'accepted' : 'needs_review',
+      matchStatus: classifyMatchStatus(match.confidence),
       embeddingProvider: 'gemini',
       embeddingModel: 'gemini-embedding-2',
       source: match.occupation.source,

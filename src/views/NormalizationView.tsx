@@ -11,6 +11,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { SkillMapping } from '../types';
+import { MATCH_ACCEPTANCE_THRESHOLD, classifyMatchStatus } from '../utils/ncoMatchingService';
 
 export const NormalizationView: React.FC = () => {
   const [mappings, setMappings] = useState<SkillMapping[]>([]);
@@ -105,15 +106,15 @@ export const NormalizationView: React.FC = () => {
   // Status computation and tab counts
   const totalCount = mappings.length;
   const acceptedCount = mappings.filter(
-    (m) => (m.matchStatus === 'accepted' || (m.confidence !== undefined && m.confidence >= 0.75))
+    (m) => (m.matchStatus === 'accepted' || (m.confidence !== undefined && m.confidence >= MATCH_ACCEPTANCE_THRESHOLD))
   ).length;
   const needsReviewCount = mappings.filter(
-    (m) => (m.matchStatus === 'needs_review' || (m.confidence !== undefined && m.confidence < 0.75))
+    (m) => (m.matchStatus === 'needs_review' || (m.confidence !== undefined && m.confidence < MATCH_ACCEPTANCE_THRESHOLD))
   ).length;
 
   // Filter by tab and search
   const filteredMappings = mappings.filter((m) => {
-    const isAccepted = m.matchStatus === 'accepted' || (m.confidence !== undefined && m.confidence >= 0.75);
+    const isAccepted = m.matchStatus === 'accepted' || (m.confidence !== undefined && m.confidence >= MATCH_ACCEPTANCE_THRESHOLD);
 
     if (activeTab === 'accepted' && !isAccepted) return false;
     if (activeTab === 'needs_review' && isAccepted) return false;
@@ -487,7 +488,7 @@ export const NormalizationView: React.FC = () => {
               ) : (
                 filteredMappings.map((m) => {
                   const isAccepted =
-                    m.matchStatus === 'accepted' || (m.confidence !== undefined && m.confidence >= 0.75);
+                    m.matchStatus === 'accepted' || (m.confidence !== undefined && m.confidence >= MATCH_ACCEPTANCE_THRESHOLD);
                   const confidenceDisplay =
                     m.confidence !== undefined ? (m.confidence * 100).toFixed(1) + '%' : '—';
 

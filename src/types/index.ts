@@ -352,3 +352,10 @@ export interface SkillPriority {
   priorityReason?: string;
 }
 
+// --- NCO-2015 MATCHING THRESHOLDS ---
+export const MATCH_ACCEPTANCE_THRESHOLD = 0.75;
+
+export function classifyMatchStatus(confidence: number): 'accepted' | 'needs_review' {
+  return confidence >= MATCH_ACCEPTANCE_THRESHOLD ? 'accepted' : 'needs_review';
+}
+

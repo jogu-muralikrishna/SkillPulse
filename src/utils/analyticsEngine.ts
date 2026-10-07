@@ -587,7 +587,7 @@ export interface SimulationResult {
   currentTrainingCapacity: number;
   currentGap: number;
   additionalCapacity: number;
-  effectivePlacementRate: number; // e.g. 0.78
+  effectivePlacementRate: number; // e.g. 0.78 or 1.0 in capacity scenario
   newTrainingCapacity: number;
   newEstimatedOutput: number;
   newEstimatedSupply: number;
@@ -595,6 +595,10 @@ export interface SimulationResult {
   gapReductionPercent: number;
   isAvailable: boolean;
   reason?: string;
+  mode?: 'CAPACITY_SCENARIO' | 'OBSERVED_PLACEMENT';
+  scenarioType?: 'Capacity scenario' | 'Observed placement outcome';
+  rawPostInterventionGap?: number;
+  unmetShortage?: number;
 }
 
 export function simulateCapacityChange(
@@ -603,17 +607,23 @@ export function simulateCapacityChange(
   district: string,
   additionalCapacity: number
 ): SimulationResult {
+  const matchesSkill = (recSkill: string, targetSkill: string) => {
+    const r = recSkill.toLowerCase().trim();
+    const t = targetSkill.toLowerCase().trim();
+    return r === t || r.includes(t) || t.includes(r);
+  };
+
   const hasDemand = DEMAND_RECORDS.some(
     d => matchesCanonicalGeography(d, { state, district }) &&
-         d.normalizedSkill.toLowerCase() === skill.toLowerCase()
+         matchesSkill(d.normalizedSkill, skill)
   );
   const hasWorkerSupply = SUPPLY_WORKER_RECORDS.some(
     s => matchesCanonicalGeography(s, { state, district }) &&
-         s.normalizedSkill.toLowerCase() === skill.toLowerCase()
+         matchesSkill(s.normalizedSkill, skill)
   );
   const hasTraining = TRAINING_RECORDS.some(
     t => matchesCanonicalGeography(t, { state, district }) &&
-         t.normalizedSkill.toLowerCase() === skill.toLowerCase()
+         matchesSkill(t.normalizedSkill, skill)
   );
 
   if (!hasDemand && !hasWorkerSupply && !hasTraining) {
@@ -679,7 +689,11 @@ export function simulateCapacityChange(
     };
   }
 
-  if (!hasTraining) {
+  // Find canonical gap analysis item
+  const gaps = calculateSkillGaps({ state, district });
+  const gapItem = gaps.find(g => matchesSkill(g.normalizedSkill, skill));
+
+  if (!gapItem || !gapItem.isComparable || gapItem.effectiveSupply === null) {
     return {
       skill,
       state,
@@ -696,112 +710,94 @@ export function simulateCapacityChange(
       newEstimatedGap: 0,
       gapReductionPercent: 0,
       isAvailable: false,
-      reason: 'Training-capacity data is unavailable, so the training impact cannot be estimated.'
+      reason: gapItem?.incomparabilityReason || 'Comparable demand and workforce data are not available for this selection.'
     };
   }
 
-  const rec = generateTrainingRecommendations(skill, state, district);
-
-  if (!rec) {
-    return {
-      skill,
-      state,
-      district,
-      projectedDemand: 0,
-      currentSupply: 0,
-      currentTrainingCapacity: 0,
-      currentGap: 0,
-      additionalCapacity: 0,
-      effectivePlacementRate: 0,
-      newTrainingCapacity: 0,
-      newEstimatedOutput: 0,
-      newEstimatedSupply: 0,
-      newEstimatedGap: 0,
-      gapReductionPercent: 0,
-      isAvailable: false,
-      reason: 'Comparable demand and workforce data are not available for this selection.'
-    };
-  }
+  const resolvedSkill = gapItem.normalizedSkill;
+  const currentDemand = gapItem.demand;
+  const currentSupply = gapItem.effectiveSupply;
+  const currentGap = gapItem.gap !== null ? gapItem.gap : (currentDemand - currentSupply);
 
   const trainRec = TRAINING_RECORDS.find(
     t => matchesCanonicalGeography(t, { state, district }) &&
-         t.normalizedSkill.toLowerCase() === skill.toLowerCase()
+         matchesSkill(t.normalizedSkill, resolvedSkill)
   );
 
-  if (!trainRec || trainRec.annualCapacity === null || trainRec.annualCapacity === undefined) {
-    return {
-      skill,
-      state,
-      district,
-      projectedDemand: 0,
-      currentSupply: 0,
-      currentTrainingCapacity: 0,
-      currentGap: 0,
-      additionalCapacity: 0,
-      effectivePlacementRate: 0,
-      newTrainingCapacity: 0,
-      newEstimatedOutput: 0,
-      newEstimatedSupply: 0,
-      newEstimatedGap: 0,
-      gapReductionPercent: 0,
-      isAvailable: false,
-      reason: 'Institutional annual seat capacity is not reported in official candidate disclosures for this selection.'
-    };
-  }
+  const currentTrainingCapacity = trainRec?.annualCapacity ?? 0;
+  const newCapacity = currentTrainingCapacity + additionalCapacity;
 
   const hasPlacementMetrics = Boolean(
+    trainRec &&
     trainRec.certifiedCount && trainRec.certifiedCount > 0 &&
     trainRec.placedCount !== null && trainRec.placedCount !== undefined
   );
 
-  if (!hasPlacementMetrics) {
+  if (hasPlacementMetrics) {
+    // Mode: Observed Placement Outcome
+    const effectivePlacementRate = Math.round((trainRec!.placedCount! / trainRec!.certifiedCount!) * 100) / 100;
+    const currentOutput = Math.round(currentTrainingCapacity * effectivePlacementRate);
+    const additionalOutput = Math.round(additionalCapacity * effectivePlacementRate);
+    const newEstimatedSupply = currentSupply + additionalOutput;
+    const rawPostInterventionGap = currentDemand - newEstimatedSupply;
+    const unmetShortage = Math.max(0, rawPostInterventionGap);
+    const gapReduction = currentGap > 0
+      ? Math.round(((currentGap - unmetShortage) / currentGap) * 100)
+      : 0;
+
     return {
-      skill,
+      skill: resolvedSkill,
       state,
       district,
-      projectedDemand: 0,
-      currentSupply: 0,
-      currentTrainingCapacity: 0,
-      currentGap: 0,
-      additionalCapacity: 0,
-      effectivePlacementRate: 0,
-      newTrainingCapacity: 0,
-      newEstimatedOutput: 0,
-      newEstimatedSupply: 0,
-      newEstimatedGap: 0,
-      gapReductionPercent: 0,
-      isAvailable: false,
-      reason: 'Verified placement figures are not available for this training program, so output cannot be simulated without arbitrary assumptions.'
+      projectedDemand: currentDemand,
+      currentSupply,
+      currentTrainingCapacity,
+      currentGap,
+      additionalCapacity,
+      effectivePlacementRate,
+      newTrainingCapacity: newCapacity,
+      newEstimatedOutput: currentOutput + additionalOutput,
+      newEstimatedSupply,
+      newEstimatedGap: unmetShortage,
+      rawPostInterventionGap,
+      unmetShortage,
+      gapReductionPercent: gapReduction,
+      isAvailable: true,
+      mode: 'OBSERVED_PLACEMENT',
+      scenarioType: 'Observed placement outcome'
     };
   }
 
-  const effectivePlacementRate = Math.round((trainRec.placedCount! / trainRec.certifiedCount!) * 100) / 100;
-  const currentOutput = Math.round(rec.currentTrainingCapacity * effectivePlacementRate);
-  const additionalOutput = Math.round(additionalCapacity * effectivePlacementRate);
-
-  const newCapacity = rec.currentTrainingCapacity + additionalCapacity;
-  const newEstimatedSupply = rec.estimatedAvailableSupply + additionalOutput;
-  const newGap = rec.projectedDemand - newEstimatedSupply;
-  const gapReduction = rec.potentialGap > 0
-    ? Math.round(((rec.potentialGap - Math.max(0, newGap)) / rec.potentialGap) * 100)
+  // Mode: Capacity Scenario
+  // Direct mathematical addition of proposed capacity to current effective supply
+  const scenarioSupply = currentSupply + additionalCapacity;
+  const rawPostInterventionGap = currentDemand - scenarioSupply;
+  const unmetShortage = Math.max(0, rawPostInterventionGap);
+  const gapReduction = currentGap > 0
+    ? Math.round(((currentGap - unmetShortage) / currentGap) * 100)
     : 0;
 
   return {
-    skill,
+    skill: resolvedSkill,
     state,
     district,
-    projectedDemand: rec.projectedDemand,
-    currentSupply: rec.estimatedAvailableSupply,
-    currentTrainingCapacity: rec.currentTrainingCapacity,
-    currentGap: rec.potentialGap,
+    projectedDemand: currentDemand,
+    currentSupply,
+    currentTrainingCapacity,
+    currentGap,
     additionalCapacity,
-    effectivePlacementRate,
+    effectivePlacementRate: 1.0,
     newTrainingCapacity: newCapacity,
-    newEstimatedOutput: currentOutput + additionalOutput,
-    newEstimatedSupply,
-    newEstimatedGap: newGap,
+    newEstimatedOutput: additionalCapacity,
+    newEstimatedSupply: scenarioSupply,
+    newEstimatedGap: unmetShortage,
+    rawPostInterventionGap,
+    unmetShortage,
     gapReductionPercent: gapReduction,
-    isAvailable: true
+    isAvailable: true,
+    mode: 'CAPACITY_SCENARIO',
+    scenarioType: 'Capacity scenario',
+    reason: 'Capacity scenario mode: Direct mathematical addition of proposed training capacity to current effective supply. Under PMKVY 4.0, placement tracking is delinked; this reflects a potential capacity ceiling scenario rather than observed placement outcomes.'
   };
 }
 

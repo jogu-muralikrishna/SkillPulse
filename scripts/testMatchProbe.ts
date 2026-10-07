@@ -18,6 +18,7 @@ import {
   findBestNcoMatch,
   matchSkill,
   MATCH_ACCEPTANCE_THRESHOLD,
+  classifyMatchStatus,
   NcoIndexEntry,
   NcoOccupationRecord
 } from '../src/utils/ncoMatchingService';
@@ -107,6 +108,26 @@ function runUnitTests() {
   }
 
   console.log('   ✅ Deterministic cosine ranking PASSED.\n');
+
+  // Boundary threshold acceptance tests
+  console.log('----------------------------------------------------------------');
+  console.log(' [UNIT TEST] Boundary Threshold Verification (0.75 Rule)');
+  console.log('----------------------------------------------------------------');
+
+  const boundaryCases: Array<{ confidence: number; expectedStatus: 'accepted' | 'needs_review' }> = [
+    { confidence: 0.7499, expectedStatus: 'needs_review' },
+    { confidence: 0.7500, expectedStatus: 'accepted' },
+    { confidence: 0.8000, expectedStatus: 'accepted' }
+  ];
+
+  for (const { confidence, expectedStatus } of boundaryCases) {
+    const status = classifyMatchStatus(confidence);
+    console.log(`   • Testing confidence ${confidence.toFixed(4)}: got '${status}' (expected '${expectedStatus}')`);
+    if (status !== expectedStatus) {
+      throw new Error(`Boundary test failed: confidence ${confidence} produced status '${status}', expected '${expectedStatus}'`);
+    }
+  }
+  console.log('   ✅ Acceptance threshold boundary tests PASSED (0.7499 -> needs_review, 0.7500 -> accepted, 0.8000 -> accepted).\n');
 }
 
 async function runIntegrationProbe() {

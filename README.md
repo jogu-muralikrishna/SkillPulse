@@ -152,3 +152,97 @@ This command executes `scripts/refresh.ts` to:
 2. **Informal Labor Representation:** Public vacancies reflect formal and tech-enabled hiring; unorganized day-labor exchanges are captured primarily through e-Shram counts.
 3. **Historical Observations:** Forecasting requires at least 4 consecutive historical quarters; where observations are $< 4$, forecasts are withheld.
 4. **Planning Support:** SkillPulse is designed as an analytical decision-support tool to inform human planners, not replace administrative deliberation.
+
+---
+
+## 10. API Reference
+
+SkillPulse exposes RESTful JSON endpoints designed for evidence-based workforce planning, econometric forecasting, semantic normalization, and conversational intelligence.
+
+### Core Labour-Market Analytics Endpoints
+
+#### 1. `GET /api/overview`
+- **Purpose:** Retrieves macro executive dashboard aggregates including total vacancies, registered workforce, count of severe skill shortages, certified training capacity, sector distributions, and quarterly hiring trends.
+- **Query Parameters:**
+  - `state` *(optional)*: State name (e.g., `Telangana`).
+  - `district` *(optional)*: District name (e.g., `Hyderabad`).
+  - `sector` *(optional)*: Sector filter (e.g., `IT-ITeS & Software`).
+  - `skill` *(optional)*: Normalized skill title.
+
+#### 2. `GET /api/demand`
+- **Purpose:** Fetches granular, filtered job vacancy records derived from National Career Service (NCS) filings with salary ranges, reporting quarters, and job roles.
+- **Query Parameters:**
+  - `state`, `district`, `sector`, `skill`, `period` *(optional)*: Filter attributes.
+
+#### 3. `GET /api/supply`
+- **Purpose:** Returns dual-track workforce supply data, clearly distinguishing unorganised registered workers (e-Shram) from institutional accredited training completions (PMKVY / MSDE).
+- **Query Parameters:**
+  - `state`, `district`, `sector`, `skill` *(optional)*: Location and competency filters.
+
+#### 4. `GET /api/gaps`
+- **Purpose:** Computes the canonical Net Skill Gap (`Demand - Effective Supply`) across all comparable skills, applying spatial/temporal comparability validation and assigning classification badges (`SHORTAGE`, `BALANCED`, `OVERSUPPLY`, `NON_COMPARABLE`).
+- **Query Parameters:**
+  - `state`, `district`, `sector`, `skill`, `period` *(optional)*.
+  - `shortageThreshold` *(optional, default: 15)*: Percentage deficit threshold.
+  - `oversupplyThreshold` *(optional, default: -15)*: Percentage surplus threshold.
+
+#### 5. `GET /api/forecast`
+- **Purpose:** Produces quarterly econometric time-series demand projections. Evaluates candidate models via out-of-sample holdout validation (Holt-Winters vs LightGBM on the FastAPI ML service, with OLS fallback) and computes 95% RMSE prediction intervals.
+- **Query Parameters:**
+  - `skill` *(required)*: Normalized skill name (e.g., `Python Development`).
+  - `state` *(required)*: State name (e.g., `Telangana`).
+  - `district` *(required)*: District name (e.g., `Hyderabad`).
+  - `horizon` *(optional, default: 4)*: Forecast horizon in quarters.
+
+#### 6. `GET /api/recommendations`
+- **Purpose:** Delivers institutional training advisories and recommended seat expansion ranges for accredited providers based on projected shortages and baseline placement rates.
+- **Query Parameters:**
+  - `skill` *(required)*, `state` *(required)*, `district` *(required)*.
+
+#### 7. `POST /api/simulate`
+- **Purpose:** Powers the interactive What-If Simulator. Models post-intervention supply, remaining unmet shortage, and gap reduction percentage when additional training seats are introduced. Supports both observed placement outcomes and mathematical capacity scenario modes.
+- **Request Body (JSON):**
+  - `skill` *(string, required)*: Target skill name.
+  - `state` *(string, required)*: Administrative state.
+  - `district` *(string, required)*: Administrative district.
+  - `additionalCapacity` *(number, required)*: Simulated trainee seats to add (e.g., `1000`).
+
+#### 8. `POST /api/priority` & `GET /api/priority`
+- **Purpose:** Evaluates and ranks local skills by labor market intervention urgency using a multi-criteria index (Demand Growth, Projected Gap, Current Shortage, Training Availability).
+- **Parameters / Body (JSON):**
+  - `state`, `district` *(required)*: Geographic area.
+  - `period` *(optional)*: Target quarter.
+  - `weights` *(optional)*: User-configurable weighting object `{ demandGrowth, projectedGap, currentShortage, trainingAvailability }`.
+
+#### 9. `GET /api/locations`
+- **Purpose:** Returns geospatial cluster metadata, district coordinates, total vacancies, active workforce counts, and prominent shortages for interactive vector map rendering.
+- **Query Parameters:**
+  - `state`, `district` *(optional)*.
+
+### Skill Normalization, Reskilling & Data Quality Endpoints
+
+#### 10. `GET /api/skills/mappings`
+- **Purpose:** Retrieves the active taxonomy mapping dictionary connecting industry job titles and raw keyword tags to canonical NCO-2015 occupational standards.
+
+#### 11. `POST /api/skills/match`
+- **Purpose:** Semantic skill-to-NCO normalization engine. Generates 768-dimensional Gemini embeddings for arbitrary raw skill terms, computes cosine similarities against 3,445 cached NCO-2015 occupations, executes domain-aware hierarchy reranking, and applies the strict acceptance threshold ($\ge 0.75 \to \text{accepted}$, $< 0.75 \to \text{needs\_review}$).
+- **Request Body (JSON):**
+  - `rawSkill` *(string, required)*: Raw input text (e.g., `"Python Scripting"`).
+
+#### 12. `GET /api/reskill`
+- **Purpose:** Embedding-based reskilling recommendation engine. For verified surplus skills (`OVERSUPPLY`), calculates semantic proximity using Gemini embeddings to identify the top 3 adjacent target skills facing active shortages within the exact same district.
+- **Query Parameters:**
+  - `state` *(required)*: State name (e.g., `Maharashtra`).
+  - `district` *(required)*: District name (e.g., `Pune`).
+  - `skill` *(required)*: Surplus skill (e.g., `CNC Precision Machining & Programming`).
+
+#### 13. `GET /api/anomalies`
+- **Purpose:** Statistical Quarter-on-Quarter (QoQ) anomaly detector. Analyzes historical delta shifts ($\Delta_t = \text{value}_t - \text{value}_{t-1}$) and flags observations deviating $> 3\sigma$ from normal historical variation with small-data ($\ge 4$ transitions) safety.
+- **Query Parameters:**
+  - `state`, `district`, `skill` *(optional)*.
+
+#### 14. `POST /api/assistant/chat`
+- **Purpose:** Autonomous labour-market conversational assistant powered by `gemini-3.8-flash` with native function-calling tools (`getGaps`, `getForecast`, `simulate`, `getPriority`, `getDemand`), server-side grounding, and source citation chips.
+- **Request Body (JSON):**
+  - `message` *(string, required)*: User question (e.g., `"What are the skill gaps in Hyderabad?"`).
+  - `history` *(array, optional)*: Prior conversational turn history `[{ role: "user" | "model", text: string }]`.

@@ -19,7 +19,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   CheckCircle2,
-  Info
+  Info,
+  Calendar
 } from 'lucide-react';
 import { TelanganaCoverageWarning } from '../components/TelanganaCoverageWarning';
 import { AnomalyDetectionResponse } from '../utils/anomalyDetection';
@@ -142,7 +143,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <div
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200/90 shadow-2xs"
+            title="SkillPulse current snapshot label (not a live ingestion timestamp)"
+          >
+            <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>Last updated: <strong className="font-semibold text-slate-900">2026-Q3</strong></span>
+            <span className="text-[10px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200 font-medium">Snapshot</span>
+          </div>
+
           <button
             onClick={() => onNavigate('assistant')}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200/80 transition-colors cursor-pointer shadow-2xs"
