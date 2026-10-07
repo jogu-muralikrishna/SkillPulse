@@ -15,6 +15,7 @@
     "nco:embed": "tsx scripts/generateNcoEmbeddings.ts",
     "test:embed": "tsx scripts/testEmbeddingProbe.ts",
     "test:match": "tsx scripts/testMatchProbe.ts",
+    "test:forecast": "tsx scripts/testMlForecastIntegration.ts",
     "skills:embed": "tsx scripts/generateSkillEmbeddings.ts"
   },
   "dependencies": {

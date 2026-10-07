@@ -34,7 +34,8 @@ import {
   findBestNcoMatch,
   MATCH_ACCEPTANCE_THRESHOLD
 } from '../utils/ncoMatchingService';
-import { SkillMapping } from '../types';
+import { formatPeriodToHuman } from '../utils/dateFormatter';
+import { SkillMapping, QualityLevel } from '../types';
 
 dotenv.config();
 
@@ -341,8 +342,11 @@ router.get('/gaps', (req: Request, res: Response) => {
   }
 });
 
-// 5. Statistical Forecast
-router.get('/forecast', (req: Request, res: Response) => {
+// 5. Statistical & Machine Learning Forecast
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8001';
+const ML_SERVICE_TIMEOUT_MS = 2500;
+
+router.get('/forecast', async (req: Request, res: Response) => {
   try {
     const { skill, state, district, horizon } = req.query as Record<string, string>;
 
@@ -352,8 +356,134 @@ router.get('/forecast', (req: Request, res: Response) => {
     }
 
     const horizonQuarters = horizon ? parseInt(horizon, 10) : 4;
-    const forecast = forecastSkillDemand(skill, state, district, horizonQuarters);
-    res.json(forecast);
+
+    // Filter matching demand observations chronologically
+    const records = DEMAND_RECORDS.filter(
+      d => d.normalizedSkill.toLowerCase() === skill.toLowerCase() &&
+           matchesCanonicalGeography(d, { state, district })
+    ).sort((a, b) => a.period.localeCompare(b.period));
+
+    const n = records.length;
+
+    // Rule 4: Minimum 4 historical quarters required
+    if (n < 4) {
+      return res.json({
+        normalizedSkill: skill,
+        state,
+        district,
+        historicalData: records.map(r => ({ period: r.period, demand: r.demandCount })),
+        forecastData: [],
+        modelUsed: 'Unavailable',
+        horizon: '0 Quarters',
+        trainingPeriod: records.length > 0 ? `${records[0].period} to ${records[records.length - 1].period}` : 'N/A',
+        metrics: { mae: 0, rmse: 0, r2: 0 },
+        explanation: 'Forecast unavailable: insufficient historical data.',
+        technicalDetails: { slope: 0, intercept: 0, sampleSize: n, confidenceInterval: 0 },
+        isAvailable: false,
+        reason: `Not enough comparable historical demand data is available for this skill and location. Found ${n} observation(s), but statistical time-series forecasting requires a minimum of 4 chronological quarters.`,
+        dataQuality: {
+          level: 'Low',
+          reason: `Only ${n} historical demand observation(s) available in dataset.`
+        }
+      });
+    }
+
+    // Attempt to invoke the Python ML forecasting microservice
+    const mlServiceUrl = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8001';
+    let mlResult: any = null;
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), ML_SERVICE_TIMEOUT_MS);
+
+      const mlRes = await fetch(`${mlServiceUrl}/forecast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          series: records.map(r => ({ period: r.period, value: r.demandCount })),
+          horizon: horizonQuarters
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (mlRes.ok) {
+        mlResult = await mlRes.json();
+      } else {
+        console.warn(`[forecast] ML service returned HTTP status ${mlRes.status}. Using OLS fallback.`);
+      }
+    } catch (err: any) {
+      console.warn(`[forecast] ML service unreachable or timed out (${err?.name === 'AbortError' ? 'timeout 2500ms' : err?.message}). Using OLS fallback.`);
+    }
+
+    // If ML service returned a valid forecast, construct and return the ML response
+    if (mlResult && mlResult.isAvailable) {
+      const forecastData = mlResult.forecast.map((pt: any, idx: number) => ({
+        period: pt.period,
+        predictedDemand: Math.round(pt.value),
+        lowerBound: Math.round(mlResult.lower95[idx]),
+        upperBound: Math.round(mlResult.upper95[idx])
+      }));
+
+      const firstPeriodHuman = formatPeriodToHuman(records[0].period);
+      const lastPeriodHuman = formatPeriodToHuman(records[records.length - 1].period);
+      const endForecastPeriodHuman = formatPeriodToHuman(forecastData[forecastData.length - 1].period);
+      const lastHistoricalDemand = records[records.length - 1].demandCount;
+      const endPredictedDemand = forecastData[forecastData.length - 1].predictedDemand;
+      const demandDelta = endPredictedDemand - lastHistoricalDemand;
+
+      const modelDisplayName = mlResult.model; // 'Holt-Winters' or 'LightGBM'
+      const qualityLevel: QualityLevel = n >= 8 ? 'High' : n >= 5 ? 'Medium' : 'Low';
+
+      const explanation = `Demand forecast produced by ${modelDisplayName} Machine Learning service, selected via out-of-sample holdout validation (validation MAPE: ${mlResult.heldOutMAPE}%). Evaluated across ${n} quarterly filings from ${firstPeriodHuman} to ${lastPeriodHuman} from the National Career Service. Projected demand reaches approximately ${endPredictedDemand.toLocaleString()} vacancies by ${endForecastPeriodHuman} (${demandDelta >= 0 ? '+' : ''}${demandDelta.toLocaleString()} relative to ${lastPeriodHuman}). 95% empirical prediction bands account for historical residual variance expanding across the forecast horizon.`;
+
+      return res.json({
+        normalizedSkill: skill,
+        state,
+        district,
+        historicalData: records.map(r => ({ period: r.period, demand: r.demandCount })),
+        forecastData,
+        modelUsed: `${modelDisplayName} (ML Forecaster)`,
+        horizon: `${horizonQuarters} Quarters (${forecastData[0].period} to ${forecastData[forecastData.length - 1].period})`,
+        trainingPeriod: `${records[0].period} to ${records[records.length - 1].period}`,
+        metrics: {
+          mae: mlResult.validation?.[modelDisplayName === 'LightGBM' ? 'lightGBM' : 'holtWinters']?.rmse || 0,
+          rmse: mlResult.validation?.[modelDisplayName === 'LightGBM' ? 'lightGBM' : 'holtWinters']?.rmse || 0,
+          r2: 0,
+          heldOutMAPE: mlResult.heldOutMAPE
+        },
+        explanation,
+        technicalDetails: {
+          slope: 0,
+          intercept: 0,
+          sampleSize: n,
+          confidenceInterval: 95,
+          holdoutSize: mlResult.validation?.holdoutSize,
+          selectedModel: modelDisplayName
+        },
+        validation: mlResult.validation,
+        isAvailable: true,
+        dataQuality: {
+          level: qualityLevel,
+          reason: `Evaluated via ${modelDisplayName} (held-out MAPE: ${mlResult.heldOutMAPE}%) across ${n} quarterly observations.`
+        }
+      });
+    }
+
+    // Fallback: Execute existing OLS linear regression baseline
+    const olsForecast = forecastSkillDemand(skill, state, district, horizonQuarters);
+
+    // Explicitly label model as OLS fallback (not ML)
+    if (olsForecast.isAvailable) {
+      olsForecast.modelUsed = 'Ordinary Least Squares (OLS) Linear Trend (Fallback)';
+      olsForecast.explanation = `[OLS Fallback] ${olsForecast.explanation} (Note: Python ML service was unavailable or timed out; executed deterministic OLS baseline).`;
+      olsForecast.validation = {
+        fallback: true,
+        reason: 'Python ML service was unreachable or timed out. Used OLS baseline as configured.'
+      };
+    }
+
+    return res.json(olsForecast);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Failed to generate forecast' });
   }

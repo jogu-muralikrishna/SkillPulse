@@ -284,6 +284,7 @@ export interface ForecastResult {
     mae: number;
     rmse: number;
     r2: number;
+    heldOutMAPE?: number;
   };
   explanation: string;
   technicalDetails: {
@@ -291,6 +292,8 @@ export interface ForecastResult {
     intercept: number;
     sampleSize: number;
     confidenceInterval: number;
+    holdoutSize?: number;
+    selectedModel?: string;
   };
   isAvailable: boolean;
   reason?: string;
@@ -298,6 +301,7 @@ export interface ForecastResult {
     level: QualityLevel;
     reason: string;
   };
+  validation?: any;
 }
 
 export interface TrainingRecommendation {
