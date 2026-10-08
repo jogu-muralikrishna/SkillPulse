@@ -37,42 +37,8 @@ import {
 import { matchesCanonicalGeography } from './canonicalGeography';
 import { DEMAND_RECORDS } from '../data/demandData';
 
-export interface ReskillingPath {
-  skill: string;
-  similarity: number;
-  districtGap: number;
-  demand: number;
-  supply: number;
-  reason: string;
-}
-
-export interface OversuppliedSkillSummary {
-  skill: string;
-  gap: number;
-  gapPercentage?: number;
-  demand?: number;
-  supply?: number;
-  classification?: string;
-}
-
-export interface ReskillingResponse {
-  source: string;
-  endpoint: string;
-  params: {
-    state: string;
-    district: string;
-    skill: string;
-  };
-  eligibleForReskilling: boolean;
-  oversuppliedSkill: OversuppliedSkillSummary | null;
-  paths: ReskillingPath[];
-  message: string;
-  provenance: {
-    methodology: string;
-    embeddingModel: string;
-    dimensionality: number;
-  };
-}
+import type { ReskillingPath, OversuppliedSkillSummary, ReskillingResponse } from '../types';
+export type { ReskillingPath, OversuppliedSkillSummary, ReskillingResponse };
 
 /**
  * Retrieves the 768-dimensional Gemini embedding for a skill.

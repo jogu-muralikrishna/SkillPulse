@@ -10,8 +10,7 @@ import {
   Plus,
   RefreshCw
 } from 'lucide-react';
-import { SkillMapping } from '../types';
-import { MATCH_ACCEPTANCE_THRESHOLD, classifyMatchStatus } from '../utils/ncoMatchingService';
+import { SkillMapping, MATCH_ACCEPTANCE_THRESHOLD, classifyMatchStatus } from '../types';
 
 export const NormalizationView: React.FC = () => {
   const [mappings, setMappings] = useState<SkillMapping[]>([]);

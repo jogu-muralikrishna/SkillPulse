@@ -359,3 +359,42 @@ export function classifyMatchStatus(confidence: number): 'accepted' | 'needs_rev
   return confidence >= MATCH_ACCEPTANCE_THRESHOLD ? 'accepted' : 'needs_review';
 }
 
+// --- RESKILLING TYPES ---
+export interface ReskillingPath {
+  skill: string;
+  similarity: number;
+  districtGap: number;
+  demand: number;
+  supply: number;
+  reason: string;
+}
+
+export interface OversuppliedSkillSummary {
+  skill: string;
+  gap: number;
+  gapPercentage?: number;
+  demand?: number;
+  supply?: number;
+  classification?: string;
+}
+
+export interface ReskillingResponse {
+  source: string;
+  endpoint: string;
+  params: {
+    state: string;
+    district: string;
+    skill: string;
+  };
+  eligibleForReskilling: boolean;
+  oversuppliedSkill: OversuppliedSkillSummary | null;
+  paths: ReskillingPath[];
+  message: string;
+  provenance: {
+    methodology: string;
+    embeddingModel: string;
+    dimensionality: number;
+  };
+}
+
+

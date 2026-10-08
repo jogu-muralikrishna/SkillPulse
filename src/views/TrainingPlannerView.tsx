@@ -23,8 +23,7 @@ import {
   Sparkles,
   Compass
 } from 'lucide-react';
-import { PlanningDataResult } from '../types';
-import { ReskillingResponse } from '../utils/reskillingService';
+import { PlanningDataResult, ReskillingResponse } from '../types';
 
 interface TrainingPlannerViewProps {
   onNavigateToSimulator?: (skill: string, state: string, district: string) => void;
