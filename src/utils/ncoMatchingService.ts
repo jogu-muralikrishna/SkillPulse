@@ -226,15 +226,19 @@ export function saveSkillEmbeddingsCache(
   filePath?: string
 ): void {
   const targetPath = filePath || DEFAULT_SKILL_CACHE_PATH;
-  const dir = path.dirname(targetPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
   cache.totalRecords = Object.keys(cache.skills).length;
   cache.updatedAt = new Date().toISOString();
-  fs.writeFileSync(targetPath, JSON.stringify(cache, null, 2), 'utf-8');
+  // Keep the in-memory cache even if the disk is read-only (e.g. Vercel serverless).
   cachedSkillEmbeddings = cache;
+  try {
+    const dir = path.dirname(targetPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(targetPath, JSON.stringify(cache, null, 2), 'utf-8');
+  } catch (err: any) {
+    console.warn(`[ncoMatching] Could not persist skill embedding cache (${err?.code || err?.message}); using in-memory cache only.`);
+  }
 }
 
 /**

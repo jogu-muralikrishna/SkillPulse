@@ -47,9 +47,25 @@ const app = express();
 
 app.use(express.json());
 
-// Enable standard CORS headers
+// CORS: same-origin by default in production (Vercel serves UI + API from one origin).
+// Set ALLOWED_ORIGINS (comma-separated) to permit specific cross-origin browsers.
+// In local development without ALLOWED_ORIGINS, all origins are allowed (previous behaviour).
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.length > 0) {
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+  } else if (!IS_PRODUCTION) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
@@ -822,8 +838,11 @@ router.post('/skills/match', async (req: Request, res: Response) => {
     res.json(matchResult);
   } catch (err: any) {
     console.error('Error matching skill against NCO-2015:', err);
-    res.status(500).json({
-      error: err?.message || 'Failed to match skill against NCO-2015 catalogue'
+    const msg: string = err?.message || 'Failed to match skill against NCO-2015 catalogue';
+    const cacheMissing = /embedding cache not found/i.test(msg);
+    res.status(cacheMissing ? 503 : 500).json({
+      error: msg,
+      ...(cacheMissing ? { code: 'NCO_EMBEDDING_CACHE_MISSING' } : {})
     });
   }
 });

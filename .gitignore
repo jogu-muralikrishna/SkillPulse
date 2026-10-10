@@ -1,10 +1,36 @@
+# Dependencies
 node_modules/
-build/
-dist/
-coverage/
-.DS_Store
-*.log
-.env*
+.venv/
+venv/
+
+# Environment / secrets (only .env.example is committed)
+.env
+.env.*
 !.env.example
 
+# Build output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vercel/
+
+# Logs & caches
+*.log
+npm-debug.log*
+.cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Generated embedding caches (regenerate: npm run nco:embed && npm run skills:embed)
+data/derived/nco-embeddings.json
+data/derived/skill-embeddings.json
 data/derived/*

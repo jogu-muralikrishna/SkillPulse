@@ -146,6 +146,47 @@ This command executes `scripts/refresh.ts` to:
 
 ---
 
+## 8a. Environment, Caches, ML Service & Deployment
+
+### Environment variables (server-side only)
+Copy `.env.example` to `.env` (Windows: `copy .env.example .env`). Never commit `.env`.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | For assistant, embeddings, semantic matching | Gemini access. Server-only; never exposed to the browser bundle or API responses. |
+| `ML_SERVICE_URL` | Optional | Python forecast service URL (default `http://127.0.0.1:8001`). If unreachable, `/api/forecast` uses the built-in OLS fallback and labels it as such. |
+| `GEMINI_MODEL` | Optional | Overrides the assistant chat model. |
+| `ALLOWED_ORIGINS` | Optional | Comma-separated cross-origin browser origins. Unset = same-origin only in production (all origins in local dev). |
+
+### Embedding caches (not committed)
+`data/derived/nco-embeddings.json` (~55 MB) and `data/derived/skill-embeddings.json` are generated files and are git-ignored. Regenerate locally (uses Gemini API quota):
+```bash
+npm run nco:embed
+npm run skills:embed
+```
+Without the NCO cache, `POST /api/skills/match` returns HTTP 503 with `code: NCO_EMBEDDING_CACHE_MISSING`; other endpoints keep working. String matching is **not** used as a substitute.
+
+### Python ML service (local)
+```bash
+cd ml-service
+python -m venv .venv
+.venv\Scripts\activate        # Windows (macOS/Linux: source .venv/bin/activate)
+pip install -r requirements.txt
+python app.py                  # http://127.0.0.1:8001  (GET /health, POST /forecast)
+```
+
+### Deploying to Vercel
+1. Push the repo to GitHub and import it in Vercel (framework: Vite; `vercel.json` sets build command, `dist` output, SPA fallback and `/api/*` -> `api/index.ts`).
+2. Project Settings -> Environment Variables: add `GEMINI_API_KEY` (and optionally `ML_SERVICE_URL`, `GEMINI_MODEL`) for Production.
+3. Deploy. Nested routes refresh correctly; the browser calls relative `/api/...` paths.
+
+**Known limits on Vercel**
+- **ML service is not deployed by Vercel.** Host `ml-service/` separately on any Python host (container/VM) and set `ML_SERVICE_URL`. Until then, forecasts use the OLS fallback.
+- **Embedding caches are not in Git**, so a Git-based deploy has no NCO cache: semantic matching returns 503 until a cache is supplied. Options: build and include the cache in a deploy you control, or move it to external storage and load it at startup (not implemented).
+- The serverless filesystem is read-only: on-demand skill embeddings are kept in memory per instance only, not persisted.
+- Functions have a 30 s limit (`maxDuration`); the ML call times out at 2.5 s and falls back.
+- Data in `src/data` and `data/raw` is development/fixture data unless marked verified in its provenance metadata.
+
 ## 9. Known Scope Boundaries
 
 1. **Development Fixtures:** Demand records are testing fixtures pending primary raw source ingestion.
